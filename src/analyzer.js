@@ -951,11 +951,11 @@ export async function testSignals() {
       if (signal) {
         console.log(`   ✅ SIGNAL GENERATED: ${signal.direction}`);
         console.log(`   💰 Entry: $${signal.entry.toLocaleString()}`);
-        console.log(`   🎯 Take Profit: $${signal.takeProfit.toLocaleString()}`);
-        console.log(`   🛡️ Stop Loss: $${signal.stopLoss.toLocaleString()}`);
-        console.log(`   📈 Confidence: ${signal.confidence}%`);
-        console.log(`   📋 Confluences (${signal.passedRules.length}):`);
-        signal.reasoning.forEach(reason => console.log(`      ${reason}`));
+        console.log(`   🎯 Take Profit: $${signal.tp.toLocaleString()}`);
+        console.log(`   🛡️ Stop Loss: $${signal.sl.toLocaleString()}`);
+        console.log(`   📈 Score: ${signal.score}/${signal.maxScore}`);
+        console.log(`   📋 Confluences (${signal.reasons.length}):`);
+        signal.reasons.forEach(reason => console.log(`      • ${reason}`));
         
         signals.push(signal);
       } else {
@@ -976,8 +976,8 @@ export async function testSignals() {
   if (signals.length > 0) {
     console.log(`\n🚨 ACTIVE SIGNALS:\n`);
     signals.forEach((sig, idx) => {
-      console.log(`${idx + 1}. ${sig.symbol} ${sig.direction} - Score: ${sig.score}/${sig.maxScore} (${sig.confidence}%)`);
-      console.log(`   Entry: $${sig.entry.toLocaleString()} | TP: $${sig.takeProfit.toLocaleString()} | SL: $${sig.stopLoss.toLocaleString()}`);
+      console.log(`${idx + 1}. ${sig.symbol} ${sig.direction} - Score: ${sig.score}/${sig.maxScore}`);
+      console.log(`   Entry: $${sig.entry.toLocaleString()} | TP: $${sig.tp.toLocaleString()} | SL: $${sig.sl.toLocaleString()}`);
       console.log('');
     });
   } else {

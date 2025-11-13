@@ -458,9 +458,22 @@ export function initTelegram() {
     handleStatusCommand(ctx);
   });
   
+  // /reset command - Manually reset daily lock
+  telegramBot.command('reset', async (ctx) => {
+    try {
+      // Import manualResetLock dynamically to avoid circular dependency
+      const { manualResetLock } = await import('./bot.js');
+      const message = manualResetLock();
+      ctx.reply(message);
+    } catch (error) {
+      console.error('❌ Error resetting lock:', error.message);
+      ctx.reply('❌ Error resetting lock. Check logs.');
+    }
+  });
+  
   // Start command
   telegramBot.command('start', (ctx) => {
-    ctx.reply('🤖 Crypto Signal Bot is active!\nYou will receive trading signals here.');
+    ctx.reply('🤖 Crypto Signal Bot is active!\n\nCommands:\n/status - View bot health\n/log <id> <win|loss> <pnl%> - Log trade outcome\n/reset - Clear daily signal lock');
   });
   
   // Launch bot

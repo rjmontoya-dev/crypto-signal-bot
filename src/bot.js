@@ -13,8 +13,33 @@ console.log('🪙 Tokens:', process.env.TOKENS);
 console.log('⏰ Timeframe:', process.env.TIMEFRAME);
 console.log('🧪 Paper Trading:', process.env.PAPER_TRADING);
 console.log('🚦 Max Open Trades:', process.env.MAX_OPEN_TRADES || 1);
+console.log('🔒 Hourly scanning enabled with daily lockout');
 console.log('═'.repeat(70));
 console.log('');
+
+// ============================================================================
+// DAILY LOCKOUT SYSTEM
+// ============================================================================
+
+// Track if signal was sent today (resets at 00:00 UTC)
+let signalSentToday = false;
+
+/**
+ * Reset the daily lock at 00:00 UTC
+ */
+function resetDailyLock() {
+  signalSentToday = false;
+  console.log('🔓 Daily lock reset at 00:00 UTC - scanning resumes');
+}
+
+/**
+ * Manually reset the lock (for /reset command)
+ */
+export function manualResetLock() {
+  signalSentToday = false;
+  console.log('🔓 Manual lock reset via /reset command');
+  return '✅ Daily lock cleared. Scanning will resume on next hourly check.';
+}
 
 // ============================================================================
 // DAILY SCAN FUNCTION
@@ -25,9 +50,16 @@ console.log('');
  */
 async function dailyScan() {
   const startTime = new Date();
-  console.log('\n🔍 Starting daily market scan...');
+  console.log('\n🔍 Starting hourly market scan...');
   console.log(`⏰ Scan time: ${startTime.toLocaleString()} (${startTime.toISOString()})`);
   console.log('═'.repeat(70));
+  
+  // Check if signal already sent today
+  if (signalSentToday) {
+    console.log('🔒 Signal already sent today. Skipping.');
+    console.log('💡 Next scan will occur at 00:00 UTC or use /reset command\n');
+    return;
+  }
   
   // Check max open trades
   const maxOpenTrades = parseInt(process.env.MAX_OPEN_TRADES || '1');
@@ -115,6 +147,10 @@ async function dailyScan() {
           await sendSignal(signal);
           signalsGenerated++;
           generatedSignals.push(signal);
+          
+          // Set lock - first qualifying signal stops further alerts for the day
+          signalSentToday = true;
+          console.log(`   🔒 Daily lock activated - no more signals until 00:00 UTC`);
         } else {
           // Live mode - send to Telegram
           console.log(`   📱 Sending to Telegram...`);
@@ -124,10 +160,17 @@ async function dailyScan() {
             console.log(`   ✅ Alert sent successfully`);
             signalsGenerated++;
             generatedSignals.push(signal);
+            
+            // Set lock - first qualifying signal stops further alerts for the day
+            signalSentToday = true;
+            console.log(`   🔒 Daily lock activated - no more signals until 00:00 UTC`);
           } else {
             console.log(`   ⚠️  Failed to send alert`);
           }
         }
+        
+        // Break loop after first signal is sent
+        break;
         
       } else {
         console.log(`   ⏸️  No signal - score below threshold`);
@@ -187,26 +230,34 @@ async function startBot() {
   initTelegram();
   console.log('✅ Telegram bot ready\n');
   
-  // Schedule daily scan at 08:00 UTC
-  console.log('⏰ Setting up daily schedule...');
-  cron.schedule('0 8 * * *', async () => {
-    console.log('\n⏰ Scheduled scan triggered (08:00 UTC)');
+  // Schedule hourly scan
+  console.log('⏰ Setting up hourly scan schedule...');
+  cron.schedule('0 * * * *', async () => {
+    console.log('\n⏰ Hourly scan triggered');
     await dailyScan();
   }, {
     timezone: 'UTC'
   });
   
-  console.log('✅ Daily scan scheduled for 08:00 UTC\n');
+  console.log('✅ Hourly scan scheduled (top of every hour)\n');
+  
+  // Schedule daily lock reset at 00:00 UTC
+  console.log('🔒 Setting up daily lock reset...');
+  cron.schedule('0 0 * * *', () => {
+    resetDailyLock();
+  }, {
+    timezone: 'UTC'
+  });
+  
+  console.log('✅ Daily lock reset scheduled for 00:00 UTC\n');
   
   // Calculate next scan time
   const now = new Date();
-  const next = new Date();
-  next.setUTCHours(8, 0, 0, 0);
-  if (next <= now) {
-    next.setDate(next.getDate() + 1);
-  }
+  const nextHour = new Date(now);
+  nextHour.setMinutes(0, 0, 0);
+  nextHour.setHours(nextHour.getHours() + 1);
   
-  console.log(`📅 Next scheduled scan: ${next.toLocaleString()} UTC`);
+  console.log(`📅 Next hourly scan: ${nextHour.toLocaleString()} UTC`);
   console.log('═'.repeat(70));
   
   // Run immediate scan for testing
