@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import cron from 'node-cron';
-import { fetchOHLCV, getFundingRate, calculateIndicators, generateSignal } from './analyzer.js';
-import { sendSignal, sendMessage, initTelegram, getOpenTradesCount } from './messenger.js';
+import { fetchOHLCV, getFundingRate, calculateIndicators, generateSignal } from '../signals/analyzer.js';
+import { sendSignal, sendMessage, initTelegram, getOpenTradesCount } from '../telegram/messenger.js';
 
 // Load environment variables
 dotenv.config();

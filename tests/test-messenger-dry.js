@@ -1,7 +1,7 @@
 /**
  * Test messenger functions without actual Telegram API calls
  */
-import { sendSignal, sendMessage } from './src/messenger.js';
+import { sendSignal, sendMessage } from '../src/telegram/messenger.js';
 
 console.log('🧪 Testing messenger module (dry run)...\n');
 

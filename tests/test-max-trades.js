@@ -4,7 +4,7 @@
  */
 
 import dotenv from 'dotenv';
-import { getOpenTradesCount } from './src/messenger.js';
+import { getOpenTradesCount } from '../src/telegram/messenger.js';
 
 dotenv.config();
 

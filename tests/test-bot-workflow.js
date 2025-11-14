@@ -3,7 +3,7 @@
  * This forces a signal to be generated and logged
  */
 import Database from 'better-sqlite3';
-import { sendSignal, initTelegram } from './src/messenger.js';
+import { sendSignal, initTelegram } from '../src/telegram/messenger.js';
 
 console.log('🧪 Testing bot workflow with mock signal...\n');
 

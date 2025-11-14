@@ -2,7 +2,7 @@
  * Demo signal generation with simulated trigger
  * This shows what a signal looks like when score >= 7
  */
-import { generateSignal } from './src/analyzer.js';
+import { generateSignal } from '../src/analyzer.js';
 
 // Simulated indicators that would trigger a LONG signal
 const mockIndicators = {
