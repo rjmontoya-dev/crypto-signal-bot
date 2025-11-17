@@ -1,7 +1,8 @@
 import dotenv from 'dotenv';
 import cron from 'node-cron';
-import { fetchOHLCV, getFundingRate, calculateIndicators, generateSignal } from './analyzer.js';
-import { sendSignal, sendMessage, initTelegram, getOpenTradesCount } from './messenger.js';
+import { fetchOHLCV, getFundingRate, calculateIndicators, generateSignal } from '../signals/analyzer.js';
+import { sendSignal, sendMessage, initTelegram, getOpenTradesCount } from '../telegram/messenger.js';
+import { startWebServer } from '../server/index.js';
 
 // Load environment variables
 dotenv.config();
@@ -24,12 +25,17 @@ console.log('');
 // Track if signal was sent today (resets at 00:00 UTC)
 let signalSentToday = false;
 
+// Track daily trade count (independent of whether trades are closed)
+let dailyTradeCount = 0;
+
 /**
  * Reset the daily lock at 00:00 UTC
  */
 function resetDailyLock() {
   signalSentToday = false;
+  dailyTradeCount = 0;
   console.log('🔓 Daily lock reset at 00:00 UTC - scanning resumes');
+  console.log('🔢 Daily trade counter reset to 0');
 }
 
 /**
@@ -37,8 +43,10 @@ function resetDailyLock() {
  */
 export function manualResetLock() {
   signalSentToday = false;
+  dailyTradeCount = 0;
   console.log('🔓 Manual lock reset via /reset command');
-  return '✅ Daily lock cleared. Scanning will resume on next hourly check.';
+  console.log('🔢 Daily trade counter reset to 0');
+  return '✅ Daily lock cleared and trade counter reset. Scanning will resume on next hourly check.';
 }
 
 // ============================================================================
@@ -61,19 +69,19 @@ async function dailyScan() {
     return;
   }
   
-  // Check max open trades
-  const maxOpenTrades = parseInt(process.env.MAX_OPEN_TRADES || '1');
+  // Check max daily trades
+  const maxDailyTrades = parseInt(process.env.MAX_OPEN_TRADES || '1');
   const openTradesCount = getOpenTradesCount();
   
-  console.log(`📊 Open Trades: ${openTradesCount}/${maxOpenTrades}`);
+  console.log(`📊 Daily Trades: ${dailyTradeCount}/${maxDailyTrades} | Open Trades: ${openTradesCount}`);
   
-  if (openTradesCount >= maxOpenTrades) {
-    console.log('⚠️  Max open trades reached. No new signals will be generated.');
-    console.log('💡 Use /log command to close existing trades\n');
+  if (dailyTradeCount >= maxDailyTrades) {
+    console.log('⚠️  Max daily trades reached. No new signals will be generated today.');
+    console.log('💡 Counter resets at 00:00 UTC or use /reset command\n');
     
     // Send alert to Telegram if not in paper trading mode
     if (process.env.PAPER_TRADING !== 'true') {
-      await sendMessage('⚠️ Max open trades reached. No new signals until current trades are closed.');
+      await sendMessage('⚠️ Max daily trades reached. No new signals until tomorrow or /reset.');
     }
     
     return;
@@ -148,9 +156,13 @@ async function dailyScan() {
           signalsGenerated++;
           generatedSignals.push(signal);
           
+          // Increment daily trade counter
+          dailyTradeCount++;
+          
           // Set lock - first qualifying signal stops further alerts for the day
           signalSentToday = true;
           console.log(`   🔒 Daily lock activated - no more signals until 00:00 UTC`);
+          console.log(`   🔢 Daily trade count: ${dailyTradeCount}/${maxDailyTrades}`);
         } else {
           // Live mode - send to Telegram
           console.log(`   📱 Sending to Telegram...`);
@@ -161,9 +173,13 @@ async function dailyScan() {
             signalsGenerated++;
             generatedSignals.push(signal);
             
+            // Increment daily trade counter
+            dailyTradeCount++;
+            
             // Set lock - first qualifying signal stops further alerts for the day
             signalSentToday = true;
             console.log(`   🔒 Daily lock activated - no more signals until 00:00 UTC`);
+            console.log(`   🔢 Daily trade count: ${dailyTradeCount}/${maxDailyTrades}`);
           } else {
             console.log(`   ⚠️  Failed to send alert`);
           }
@@ -215,6 +231,16 @@ async function dailyScan() {
   }
 }
 
+/**
+ * Trigger manual scan from UI (exported for API)
+ */
+export function triggerManualScan() {
+  console.log('🎯 Manual scan triggered from UI');
+  dailyScan().catch(error => {
+    console.error('❌ Manual scan failed:', error);
+  });
+}
+
 // ============================================================================
 // SCHEDULER & STARTUP
 // ============================================================================
@@ -229,6 +255,11 @@ async function startBot() {
   console.log('📱 Starting Telegram bot...');
   initTelegram();
   console.log('✅ Telegram bot ready\n');
+  
+  // Start web dashboard
+  console.log('🌐 Starting web dashboard...');
+  startWebServer();
+  console.log('');
   
   // Schedule hourly scan
   console.log('⏰ Setting up hourly scan schedule...');

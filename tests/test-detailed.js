@@ -2,7 +2,7 @@
  * Detailed signal analysis test - Shows all rule evaluations
  */
 import dotenv from 'dotenv';
-import { fetchOHLCV, getFundingRate, calculateIndicators, scoreSignal } from './src/analyzer.js';
+import { fetchOHLCV, getFundingRate, calculateIndicators, scoreSignal } from '../src/signals/analyzer.js';
 
 dotenv.config();
 

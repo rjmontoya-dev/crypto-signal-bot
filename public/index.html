@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Signal Bot - Dashboard</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body>
+  <div x-data="dashboard()" x-init="init()" class="container">
+    
+    <!-- Header -->
+    <header class="header">
+      <h1>🤖 Crypto Signal Bot Dashboard</h1>
+      <div class="header-actions">
+        <button @click="triggerScan()" :disabled="scanning" class="btn btn-primary">
+          <span x-show="!scanning">🔍 Force Scan Now</span>
+          <span x-show="scanning">⏳ Scanning...</span>
+        </button>
+        <button @click="resetLock()" class="btn btn-secondary">🔓 Reset Daily Lock</button>
+        <button @click="refreshData()" class="btn btn-secondary">🔄 Refresh</button>
+        <a href="/api/export-csv" class="btn btn-success">📥 Export CSV</a>
+      </div>
+    </header>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Signals</div>
+        <div class="stat-value" x-text="stats.overview.totalSignals || 0"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Open Trades</div>
+        <div class="stat-value" x-text="stats.overview.openTrades || 0"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" x-text="(stats.overview.winRate || 0) + '%'"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg PnL</div>
+        <div class="stat-value" :class="stats.overview.avgPnl >= 0 ? 'positive' : 'negative'" 
+             x-text="(stats.overview.avgPnl || 0) + '%'"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Wins</div>
+        <div class="stat-value positive" x-text="stats.overview.wins || 0"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Losses</div>
+        <div class="stat-value negative" x-text="stats.overview.losses || 0"></div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button @click="activeTab = 'signals'" :class="{ active: activeTab === 'signals' }" class="tab">
+        📊 Signals
+      </button>
+      <button @click="activeTab = 'stats'" :class="{ active: activeTab === 'stats' }" class="tab">
+        📈 Statistics
+      </button>
+      <button @click="activeTab = 'config'" :class="{ active: activeTab === 'config' }" class="tab">
+        ⚙️ Config
+      </button>
+      <button @click="activeTab = 'logs'" :class="{ active: activeTab === 'logs' }" class="tab">
+        📝 Logs
+      </button>
+    </div>
+
+    <!-- Signals Tab -->
+    <div x-show="activeTab === 'signals'" class="tab-content">
+      <!-- Filters -->
+      <div class="filters">
+        <div class="filter-group">
+          <label>Outcome:</label>
+          <select x-model="filters.outcome" @change="fetchSignals()">
+            <option value="all">All</option>
+            <option value="pending">Pending</option>
+            <option value="win">Wins</option>
+            <option value="loss">Losses</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Status:</label>
+          <select x-model="filters.status" @change="fetchSignals()">
+            <option value="">All</option>
+            <option value="pending">Pending</option>
+            <option value="taken">Taken</option>
+            <option value="skipped">Skipped</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Symbol:</label>
+          <input type="text" x-model="filters.symbol" @keyup.debounce.500ms="fetchSignals()" placeholder="e.g. BTC">
+        </div>
+        <div class="filter-group">
+          <label>Sort By:</label>
+          <select x-model="filters.sort" @change="fetchSignals()">
+            <option value="created_at">Date</option>
+            <option value="score">Score</option>
+            <option value="symbol">Symbol</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Order:</label>
+          <select x-model="filters.order" @change="fetchSignals()">
+            <option value="DESC">Newest First</option>
+            <option value="ASC">Oldest First</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Signals Table -->
+      <div class="table-container">
+        <table class="signals-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Symbol</th>
+              <th>Direction</th>
+              <th>Entry</th>
+              <th>TP</th>
+              <th>SL</th>
+              <th>Score</th>
+              <th>Status</th>
+              <th>Outcome</th>
+              <th>PnL %</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-if="signals.length === 0">
+              <tr>
+                <td colspan="12" style="text-align: center; padding: 2rem;">
+                  No signals found
+                </td>
+              </tr>
+            </template>
+            <template x-for="signal in signals" :key="signal.id">
+              <tr>
+                <td x-text="signal.id"></td>
+                <td x-text="signal.symbol"></td>
+                <td>
+                  <span class="badge" :class="signal.direction === 'LONG' ? 'badge-long' : 'badge-short'" 
+                        x-text="signal.direction"></span>
+                </td>
+                <td x-text="'$' + signal.entry.toLocaleString()"></td>
+                <td x-text="'$' + signal.tp.toLocaleString()"></td>
+                <td x-text="'$' + signal.sl.toLocaleString()"></td>
+                <td>
+                  <span x-text="signal.score + '/' + signal.max_score"></span>
+                  <small x-text="'(' + Math.round((signal.score / signal.max_score) * 100) + '%)'"></small>
+                </td>
+                <td>
+                  <span class="badge badge-status" x-text="signal.status || 'pending'"></span>
+                </td>
+                <td>
+                  <span x-show="signal.outcome" class="badge" 
+                        :class="{
+                          'badge-win': signal.outcome === 'win',
+                          'badge-loss': signal.outcome === 'loss',
+                          'badge-skip': signal.outcome === 'skip'
+                        }"
+                        x-text="signal.outcome"></span>
+                  <span x-show="!signal.outcome" class="badge badge-pending">Pending</span>
+                </td>
+                <td>
+                  <span x-show="signal.pnl_percent !== null" 
+                        :class="signal.pnl_percent >= 0 ? 'positive' : 'negative'"
+                        x-text="signal.pnl_percent + '%'"></span>
+                  <span x-show="signal.pnl_percent === null">-</span>
+                </td>
+                <td x-text="formatDate(signal.created_at)"></td>
+                <td>
+                  <button @click="viewDetails(signal)" class="btn-icon" title="View Details">👁️</button>
+                  <button x-show="!signal.outcome || signal.outcome === 'skip'" @click="openCloseTrade(signal)" class="btn-icon" title="Close Trade">❌</button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination Controls -->
+      <div class="pagination-container">
+        <div class="pagination-info">
+          <span x-text="`Showing ${signals.length} of ${pagination.totalRecords} signals`"></span>
+          <div class="page-size-selector">
+            <label>Per page:</label>
+            <select x-model="pagination.pageSize" @change="changePageSize()" class="page-size-select">
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="pagination-controls">
+          <button 
+            @click="previousPage()" 
+            :disabled="pagination.currentPage === 1"
+            class="btn btn-pagination"
+          >
+            ← Previous
+          </button>
+          
+          <div class="page-numbers">
+            <template x-for="page in pageNumbers" :key="page">
+              <button
+                @click="goToPage(page)"
+                :class="{ 
+                  'page-number': true, 
+                  'active': page === pagination.currentPage,
+                  'ellipsis': page === '...'
+                }"
+                :disabled="page === '...'"
+                x-text="page"
+              ></button>
+            </template>
+          </div>
+          
+          <button 
+            @click="nextPage()" 
+            :disabled="pagination.currentPage === pagination.totalPages"
+            class="btn btn-pagination"
+          >
+            Next →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics Tab -->
+    <div x-show="activeTab === 'stats'" class="tab-content">
+      <div class="stats-section">
+        <h3>📊 Per-Token Performance</h3>
+        <div class="table-container">
+          <table class="stats-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Total Trades</th>
+                <th>Wins</th>
+                <th>Losses</th>
+                <th>Win Rate</th>
+                <th>Avg PnL</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="token in stats.tokenStats" :key="token.symbol">
+                <tr>
+                  <td x-text="token.symbol"></td>
+                  <td x-text="token.total"></td>
+                  <td class="positive" x-text="token.wins"></td>
+                  <td class="negative" x-text="token.losses"></td>
+                  <td x-text="token.winRate + '%'"></td>
+                  <td :class="token.avg_pnl >= 0 ? 'positive' : 'negative'" 
+                      x-text="token.avg_pnl + '%'"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="stats-section">
+        <h3>📈 Direction Performance</h3>
+        <div class="direction-stats">
+          <div class="direction-card">
+            <h4>📈 LONG</h4>
+            <p>Total: <strong x-text="stats.directionStats.long.total"></strong></p>
+            <p>Wins: <strong class="positive" x-text="stats.directionStats.long.wins"></strong></p>
+            <p>Win Rate: <strong x-text="stats.directionStats.long.winRate + '%'"></strong></p>
+          </div>
+          <div class="direction-card">
+            <h4>📉 SHORT</h4>
+            <p>Total: <strong x-text="stats.directionStats.short.total"></strong></p>
+            <p>Wins: <strong class="positive" x-text="stats.directionStats.short.wins"></strong></p>
+            <p>Win Rate: <strong x-text="stats.directionStats.short.winRate + '%'"></strong></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-section">
+        <h3>🎯 Top Performing Confluences (on Wins)</h3>
+        <div class="rules-list">
+          <template x-for="rule in stats.topRules" :key="rule.rule">
+            <div class="rule-item">
+              <span class="rule-name" x-text="rule.rule"></span>
+              <span class="rule-count" x-text="'×' + rule.count"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Config Tab -->
+    <div x-show="activeTab === 'config'" class="tab-content">
+      <div class="config-section">
+        <h3>⚙️ Bot Configuration</h3>
+        <div class="config-grid">
+          <div class="config-item">
+            <strong>Exchange:</strong>
+            <span x-text="config.exchange"></span>
+          </div>
+          <div class="config-item">
+            <strong>Timeframe:</strong>
+            <span x-text="config.timeframe"></span>
+          </div>
+          <div class="config-item">
+            <strong>Paper Trading:</strong>
+            <span x-text="config.paperTrading ? 'Yes' : 'No'"></span>
+          </div>
+          <div class="config-item">
+            <strong>Max Open Trades:</strong>
+            <span x-text="config.maxOpenTrades"></span>
+          </div>
+          <div class="config-item">
+            <strong>Telegram Connected:</strong>
+            <span x-text="config.telegramConnected ? '✅ Yes' : '❌ No'"></span>
+          </div>
+          <div class="config-item">
+            <strong>CryptoPanic Enabled:</strong>
+            <span x-text="config.cryptoPanicEnabled ? '✅ Yes' : '❌ No'"></span>
+          </div>
+        </div>
+        <div class="config-item full-width">
+          <strong>Tokens:</strong>
+          <div class="token-list">
+            <template x-for="token in config.tokens.split(',')" :key="token">
+              <span class="token-badge" x-text="token.trim()"></span>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs Tab -->
+    <div x-show="activeTab === 'logs'" class="tab-content">
+      <div class="logs-section">
+        <div class="logs-header">
+          <h3>📝 Recent Logs (Last 50 lines)</h3>
+          <button @click="fetchLogs()" class="btn btn-secondary">🔄 Refresh Logs</button>
+        </div>
+        <div class="logs-container">
+          <template x-if="logs.length === 0">
+            <p>No logs available</p>
+          </template>
+          <template x-for="(log, index) in logs" :key="index">
+            <div class="log-line" x-text="log"></div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signal Details Modal -->
+    <div x-show="showModal" @click.away="showModal = false" class="modal" style="display: none;" 
+         x-transition:enter="fade-in" x-transition:leave="fade-out">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Signal Details</h3>
+          <button @click="showModal = false" class="close-btn">×</button>
+        </div>
+        <div class="modal-body" x-show="selectedSignal">
+          <div class="detail-grid">
+            <div class="detail-item">
+              <strong>Symbol:</strong>
+              <span x-text="selectedSignal?.symbol"></span>
+            </div>
+            <div class="detail-item">
+              <strong>Direction:</strong>
+              <span class="badge" 
+                    :class="selectedSignal?.direction === 'LONG' ? 'badge-long' : 'badge-short'"
+                    x-text="selectedSignal?.direction"></span>
+            </div>
+            <div class="detail-item">
+              <strong>Entry Price:</strong>
+              <span x-text="'$' + selectedSignal?.entry.toLocaleString()"></span>
+            </div>
+            <div class="detail-item">
+              <strong>Take Profit:</strong>
+              <span x-text="'$' + selectedSignal?.tp.toLocaleString()"></span>
+            </div>
+            <div class="detail-item">
+              <strong>Stop Loss:</strong>
+              <span x-text="'$' + selectedSignal?.sl.toLocaleString()"></span>
+            </div>
+            <div class="detail-item">
+              <strong>Score:</strong>
+              <span x-text="selectedSignal?.score + '/' + selectedSignal?.max_score"></span>
+            </div>
+            <div class="detail-item full-width">
+              <strong>Confluences:</strong>
+              <ul class="confluences-list">
+                <template x-for="reason in selectedSignal?.reasons" :key="reason">
+                  <li x-text="reason"></li>
+                </template>
+              </ul>
+            </div>
+            <div class="detail-item full-width">
+              <strong>Created At:</strong>
+              <span x-text="selectedSignal?.created_at"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Close Trade Modal -->
+    <div x-show="showCloseModal" @click.away="showCloseModal = false" class="modal" style="display: none;" 
+         x-transition:enter="fade-in" x-transition:leave="fade-out">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Close Trade</h3>
+          <button @click="showCloseModal = false" class="close-btn">×</button>
+        </div>
+        <div class="modal-body" x-show="tradeToClose">
+          <div class="detail-grid">
+            <div class="detail-item">
+              <strong>Signal ID:</strong>
+              <span x-text="tradeToClose?.id"></span>
+            </div>
+            <div class="detail-item">
+              <strong>Symbol:</strong>
+              <span x-text="tradeToClose?.symbol"></span>
+            </div>
+            <div class="detail-item">
+              <strong>Direction:</strong>
+              <span class="badge" 
+                    :class="tradeToClose?.direction === 'LONG' ? 'badge-long' : 'badge-short'"
+                    x-text="tradeToClose?.direction"></span>
+            </div>
+            <div class="detail-item">
+              <strong>Entry Price:</strong>
+              <span x-text="'$' + tradeToClose?.entry.toLocaleString()"></span>
+            </div>
+            <div class="detail-item full-width">
+              <label for="outcome"><strong>Outcome:</strong></label>
+              <select id="outcome" x-model="closeForm.outcome" @change="updatePnlRequirement" class="form-select">
+                <option value="">Select outcome...</option>
+                <option value="win">🎯 Win</option>
+                <option value="loss">📉 Loss</option>
+                <option value="skip">⏭️ Skip / Not Taken</option>
+              </select>
+            </div>
+            <div class="detail-item full-width" x-show="closeForm.outcome !== 'skip'">
+              <label for="pnl"><strong>PnL % (use negative for loss):</strong></label>
+              <input 
+                type="number" 
+                id="pnl" 
+                x-model="closeForm.pnlPercent" 
+                step="0.01" 
+                placeholder="e.g. 2.5 or -1.8"
+                class="form-input"
+              />
+            </div>
+            <div class="detail-item full-width" x-show="closeForm.outcome === 'skip'">
+              <small style="color: #6b7280;">💡 PnL will be set to 0% for skipped trades. This is useful for signals you didn't take or trades you removed before they hit TP/SL.</small>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button @click="showCloseModal = false" class="btn btn-secondary">Cancel</button>
+            <button 
+              @click="submitCloseTrade()" 
+              :disabled="!closeForm.outcome || (closeForm.outcome !== 'skip' && closeForm.pnlPercent === '')"
+              class="btn btn-primary"
+            >
+              💾 Close Trade
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div x-show="toast.show" x-transition class="toast" :class="'toast-' + toast.type" 
+         style="display: none;">
+      <span x-text="toast.message"></span>
+    </div>
+
+  </div>
+
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

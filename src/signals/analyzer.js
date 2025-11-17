@@ -195,7 +195,11 @@ function getExchange() {
  * @param {number} limit - Number of candles to fetch
  * @returns {Array} Array of candle objects [{timestamp, open, high, low, close, volume}, ...]
  */
-export async function fetchOHLCV(symbol, timeframe = '4h', limit = 100) {
+export async function fetchOHLCV(symbol, timeframe, limit = 100) {
+  // Default to configured timeframe if not provided
+  if (!timeframe) {
+    timeframe = process.env.TIMEFRAME || '4h';
+  }
   try {
     const ex = getExchange();
     const ohlcv = await ex.fetchOHLCV(symbol, timeframe, undefined, limit);

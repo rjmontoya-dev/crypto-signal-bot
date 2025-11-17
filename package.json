@@ -2,22 +2,29 @@
   "name": "crypto-signal-bot",
   "version": "1.0.0",
   "description": "Personal crypto futures signal bot with Telegram alerts",
-  "main": "src/bot.js",
+  "main": "src/bot/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/bot.js",
-    "dev": "node src/bot.js"
+    "start": "node src/bot/index.js",
+    "dev": "node src/bot/index.js"
   },
-  "keywords": ["crypto", "signals", "telegram", "trading", "futures"],
+  "keywords": [
+    "crypto",
+    "signals",
+    "telegram",
+    "trading",
+    "futures"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "ccxt": "^4.3.0",
-    "technicalindicators": "^3.1.0",
-    "node-cron": "^3.0.3",
-    "telegraf": "^4.16.3",
-    "dotenv": "^16.4.5",
+    "axios": "^1.7.7",
     "better-sqlite3": "^11.5.0",
-    "axios": "^1.7.7"
+    "ccxt": "^4.3.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "node-cron": "^3.0.3",
+    "technicalindicators": "^3.1.0",
+    "telegraf": "^4.16.3"
   }
 }

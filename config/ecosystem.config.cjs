@@ -15,12 +15,13 @@
 module.exports = {
   apps: [{
     name: 'crypto-signals',
-    script: 'src/bot.js',
+    script: 'src/bot/index.js',
     
     // Environment variables
     env: {
       NODE_ENV: 'production',
-      PAPER_TRADING: 'false'  // Override to false in production
+      PAPER_TRADING: 'false',  // Override to false in production
+      UI_PORT: '3000'  // Web dashboard port
     },
     
     // Logging configuration

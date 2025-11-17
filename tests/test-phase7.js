@@ -6,8 +6,8 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getOpenTradesCount } from './src/messenger.js';
-import { weeklyReview } from './src/analyzer.js';
+import { getOpenTradesCount } from '../src/telegram/messenger.js';
+import { weeklyReview } from '../src/signals/analyzer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
