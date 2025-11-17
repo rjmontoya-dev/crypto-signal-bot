@@ -2,7 +2,9 @@
 
 ## 📦 Project Overview
 
-A personal crypto futures signal bot that scans markets daily, calculates technical confluences, and sends entry/TP/SL alerts to Telegram. **This is a decision-support tool, NOT an auto-trader.**
+A personal crypto futures signal bot that scans markets hourly, calculates technical confluences, and sends entry/TP/SL alerts to Telegram. **This is a decision-support tool, NOT an auto-trader.**
+
+**NEW:** 🌐 **Web Dashboard** - Monitor signals, view stats, and control the bot from your browser!
 
 ## ✅ Completed Features
 
@@ -13,23 +15,47 @@ A personal crypto futures signal bot that scans markets daily, calculates techni
 - ✅ **Signal Generation** - Only triggers when score ≥ 7 (threshold)
 - ✅ **Telegram Alerts** - Formatted messages with interactive buttons
 - ✅ **SQLite Logging** - Persistent storage of all signals and decisions
-- ✅ **Daily Scheduling** - Automated scans at 08:00 UTC
+- ✅ **Hourly Scheduling** - Automated scans every hour with daily lockout
 - ✅ **Button Interactions** - Log "taken" or "skipped" trades
+
+### Phase 9: Hourly Scanning + Daily Lockout
+- ✅ **Hourly Cron** - Scans market every hour (top of the hour)
+- ✅ **Daily Lockout** - Sends only ONE signal per day to prevent spam
+- ✅ **Auto Reset** - Lock clears at 00:00 UTC automatically
+- ✅ **Manual Reset** - `/reset` command to clear lock early
+
+### NEW: Web Dashboard 🌐
+- ✅ **Real-time monitoring** - View all signals, stats, and logs
+- ✅ **Manual controls** - Force scan, reset lock, export CSV
+- ✅ **Performance metrics** - Win rate, PnL, per-token stats
+- ✅ **Lightweight UI** - Alpine.js + vanilla HTML/CSS
+- ✅ **No authentication** - Simple, personal use
+- ✅ **Runs on port 3000** - Access at http://localhost:3000
 
 ## 📁 Project Structure
 
 ```
 crypto_bot/
 ├── src/
-│   ├── bot.js          # Main orchestrator & daily scheduler
-│   ├── analyzer.js     # Data fetching, indicators, signal generation
-│   └── messenger.js    # Telegram delivery & SQLite logging
+│   ├── bot/
+│   │   └── index.js        # Main orchestrator & scheduler
+│   ├── signals/
+│   │   └── analyzer.js     # Data fetching, indicators, signals
+│   ├── telegram/
+│   │   └── messenger.js    # Telegram delivery & SQLite logging
+│   └── server/
+│       └── index.js        # Express web server & API
+├── public/                 # Web dashboard files
+│   ├── index.html
+│   ├── css/styles.css
+│   └── js/dashboard.js
 ├── data/
-│   └── signals.db      # SQLite database (auto-created)
-├── .env                # Configuration (Telegram tokens, tokens list)
-├── package.json        # Dependencies
-├── test-*.js           # Various test scripts
-└── view-signals.js     # Database viewer
+│   └── signals.db          # SQLite database (auto-created)
+├── config/
+│   └── ecosystem.config.cjs # PM2 configuration
+├── .env                    # Configuration
+├── package.json            # Dependencies
+└── tests/                  # Test scripts
 ```
 
 ## ⚙️ Configuration
@@ -46,6 +72,9 @@ EXCHANGE=binance
 TOKENS=BTC/USDT,ETH/USDT,SOL/USDT,ADA/USDT
 TIMEFRAME=4h
 PAPER_TRADING=true
+
+# Web Dashboard
+UI_PORT=3000
 ```
 
 ### Telegram Setup Steps
@@ -118,6 +147,9 @@ pm2 delete crypto-signals
 The deployment script will:
 1. Pull latest code from git
 2. Install dependencies
+The deployment script will:
+1. Pull latest code from git
+2. Install dependencies
 3. Restart PM2 process
 4. Save process list
 5. Show current status
@@ -130,6 +162,54 @@ The deployment script will:
 - ✅ Auto-start on server reboot
 - ✅ Resource usage tracking
 
+---
+
+## 🌐 Web Dashboard
+
+### Quick Start
+
+Once the bot is running, access the dashboard at:
+
+```
+http://localhost:3000
+```
+
+### Features
+
+**📊 Signals Tab**
+- View all trading signals in sortable table
+- Filter by outcome (wins/losses), status, symbol
+- Click signal to view detailed confluence reasons
+
+**📈 Statistics Tab**
+- Overall win rate and average PnL
+- Per-token performance breakdown
+- LONG vs SHORT direction comparison
+- Top 10 performing confluences
+
+**⚙️ Config Tab**
+- View bot configuration
+- Check connection status
+- See which tokens are being scanned
+
+**📝 Logs Tab**
+- View last 50 lines from bot logs
+- Monitor scan progress in real-time
+
+**🎛️ Manual Controls**
+- **Force Scan Now** - Trigger immediate market scan
+- **Reset Daily Lock** - Clear hourly lockout
+- **Export CSV** - Download all signals
+- **Refresh** - Update dashboard data
+
+### Documentation
+
+- 📄 **[QUICK-START-UI.md](./QUICK-START-UI.md)** - Fast setup guide
+- 📄 **[WEB-DASHBOARD.md](./WEB-DASHBOARD.md)** - Complete documentation
+- 📄 **[SUMMARY-UI.md](./SUMMARY-UI.md)** - Implementation details
+
+---
+
 ### Test Commands
 
 ```powershell
@@ -137,25 +217,25 @@ The deployment script will:
 node view-signals.js
 
 # Test data fetching only
-node src/analyzer.js
+node src/signals/analyzer.js
 
 # Test indicator calculations
-node src/analyzer.js --indicators
+node src/signals/analyzer.js --indicators
 
 # Test signal generation
-node src/analyzer.js --signal
+node src/signals/analyzer.js --signal
 
 # Scan all tokens for signals
-node src/analyzer.js --signals
+node src/signals/analyzer.js --signals
 
 # Test Telegram messenger (with mock signal)
-node src/messenger.js
+node src/telegram/messenger.js
 
 # Test complete workflow
-node test-bot-workflow.js
+node tests/test-bot-workflow.js
 
 # Test database operations
-node test-database.js
+node tests/test-database.js
 ```
 
 ## 📊 Signal Criteria

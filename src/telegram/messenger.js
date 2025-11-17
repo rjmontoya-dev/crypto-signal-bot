@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -22,7 +23,15 @@ let db = null;
  */
 function initDatabase() {
   if (!db) {
-    const dbPath = path.join(__dirname, '..', 'data', 'signals.db');
+    const dbDir = path.join(__dirname, '..', '..', 'data');
+    const dbPath = path.join(dbDir, 'signals.db');
+    
+    // Create data directory if it doesn't exist
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+      console.log('✅ Created data directory');
+    }
+    
     db = new Database(dbPath);
     
     // Create signals table
@@ -128,6 +137,63 @@ export function getOpenTradesCount() {
   const database = initDatabase();
   const result = database.prepare('SELECT COUNT(*) as count FROM signals WHERE outcome IS NULL').get();
   return result.count;
+}
+
+/**
+ * Close a trade manually by ID
+ * @param {number} signalId - Signal ID
+ * @param {string} outcome - 'win', 'loss', or 'skip'
+ * @param {number} pnlPercent - PnL percentage (0 for skip)
+ * @returns {Object} Result with success status and message
+ */
+export function closeTradeManually(signalId, outcome, pnlPercent) {
+  try {
+    const database = initDatabase();
+    
+    // Check if signal exists
+    const signal = database.prepare('SELECT * FROM signals WHERE id = ?').get(signalId);
+    if (!signal) {
+      return { success: false, message: `Signal #${signalId} not found in database.` };
+    }
+    
+    // Allow re-closing if changing to skip (flexible for trades that were taken then removed)
+    // Only block if trying to change from one final outcome to another (win<->loss)
+    if (signal.outcome !== null && signal.outcome !== 'skip' && outcome !== 'skip') {
+      return { success: false, message: `Signal #${signalId} is already closed with outcome: ${signal.outcome}. Cannot change between win/loss.` };
+    }
+    
+    // Update outcome
+    const stmt = database.prepare(`
+      UPDATE signals 
+      SET outcome = ?, pnl_percent = ?, action_timestamp = ? 
+      WHERE id = ?
+    `);
+    
+    const timestamp = new Date().toISOString();
+    stmt.run(outcome, pnlPercent, timestamp, signalId);
+    
+    const emoji = outcome === 'win' ? '🎯' : outcome === 'loss' ? '📉' : '⏭️';
+    const sign = pnlPercent >= 0 ? '+' : '';
+    const pnlText = outcome === 'skip' ? 'Not Taken' : `${sign}${pnlPercent}%`;
+    
+    console.log(`✅ Manually closed signal #${signalId}: ${outcome} (${pnlText})`);
+    
+    return {
+      success: true,
+      message: `${emoji} Trade #${signalId} closed: ${outcome.toUpperCase()} (${pnlText})`,
+      data: {
+        id: signalId,
+        symbol: signal.symbol,
+        direction: signal.direction,
+        outcome,
+        pnlPercent
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Error closing trade:', error.message);
+    return { success: false, message: 'Database error: ' + error.message };
+  }
 }
 
 // ============================================================================
