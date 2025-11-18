@@ -27,9 +27,11 @@ let newsCache = {
 
 /**
  * LONG signal rules with weights and reasons
- */
+ */ 
 const LONG_RULES = [
-  // RSI Rules
+  // ============================
+  // 📌 RSI & Momentum
+  // ============================
   {
     id: 'rsi_oversold',
     check: (i) => i.rsi < 30,
@@ -38,65 +40,132 @@ const LONG_RULES = [
   },
   {
     id: 'rsi_recovering',
-    check: (i) => i.rsi >= 30 && i.rsi < 40,
+    check: (i) => i.rsi >= 30 && i.rsi < 45,
     weight: 1.5,
-    reason: 'RSI recovering from oversold (30-40)'
+    reason: 'RSI recovering from oversold (30–45)'
   },
-  
-  // MACD Rules
   {
-    id: 'macd_bullish',
-    check: (i) => i.macd.histogram > 0 && i.macd.line > i.macd.signal,
+    id: 'rsi_bullish_divergence',
+    check: (i) => i.rsi > i.prev.rsi && i.price.low < i.prev.price.low,
+    weight: 2.5,
+    reason: 'Bullish RSI divergence (RSI rising while price makes lower low)'
+  },
+  {
+    id: 'rsi_momentum_flip',
+    check: (i) => i.rsi > 50,
+    weight: 1,
+    reason: 'RSI > 50 indicates bullish momentum structure'
+  },
+
+  // ============================
+  // 📌 MACD Trend Shift
+  // ============================
+  {
+    id: 'macd_bullish_crossover',
+    check: (i) => i.macd.line > i.macd.signal && i.prev.macd.line <= i.prev.macd.signal,
+    weight: 2.5,
+    reason: 'MACD bullish crossover'
+  },
+  {
+    id: 'macd_histogram_increasing',
+    check: (i) => i.macd.histogram > i.prev.macd.histogram,
     weight: 2,
-    reason: 'MACD bullish crossover confirmed'
+    reason: 'MACD histogram momentum increasing'
   },
   {
-    id: 'macd_momentum_increasing',
+    id: 'macd_histogram_positive',
     check: (i) => i.macd.histogram > 0,
-    weight: 1.5,
-    reason: 'MACD histogram positive (bullish momentum)'
+    weight: 1,
+    reason: 'MACD histogram positive (bullish pressure)'
   },
-  
-  // EMA Rules
+
+  // ============================
+  // 📌 EMA Trend Confirmation
+  // ============================
   {
-    id: 'price_above_ema',
+    id: 'price_above_ema50',
     check: (i, price) => price > i.ema50,
     weight: 1.5,
     reason: 'Price above EMA50 (uptrend)'
   },
   {
-    id: 'price_near_ema_support',
-    check: (i, price) => price < i.ema50 && (i.ema50 - price) / price < 0.02,
+    id: 'ema50_uptrend',
+    check: (i) => i.ema50 > i.ema200,
     weight: 2,
-    reason: 'Price near EMA50 support (within 2%)'
+    reason: 'EMA50 above EMA200 (macro uptrend)'
   },
-  
-  // Volume Rules
+  {
+    id: 'price_near_ema_pullback',
+    check: (i, price) =>
+      price < i.ema50 &&
+      (i.ema50 - price) / price < 0.02,
+    weight: 2,
+    reason: 'Price on pullback to EMA50 support (<2%)'
+  },
+  {
+    id: 'ema_reclaim',
+    check: (i, price) =>
+      price > i.ema50 && i.prev.price <= i.prev.ema50,
+    weight: 2,
+    reason: 'Price reclaimed EMA50 after dip'
+  },
+
+  // ============================
+  // 📌 Volume Confirmation
+  // ============================
   {
     id: 'volume_spike',
     check: (i) => i.volumeRatio > 1.5,
-    weight: 1.5,
-    reason: 'Volume spike >1.5x average'
+    weight: 2,
+    reason: 'Volume spike (>1.5x average)'
   },
   {
-    id: 'volume_strong',
+    id: 'volume_above_average',
     check: (i) => i.volumeRatio > 1.2,
     weight: 1,
-    reason: 'Above average volume >1.2x'
+    reason: 'Above-average volume (>1.2x)'
   },
-  
-  // Funding Rate Rules (Futures)
+
+  // ============================
+  // 📌 Volatility Filter (Optional but crucial)
+  // ============================
+  {
+    id: 'low_volatility_pullback',
+    check: (i) => i.atrPercent < 2.5,
+    weight: 1,
+    reason: 'Low volatility pullback (safer entries)'
+  },
+
+  // ============================
+  // 📌 Candle Confirmation
+  // ============================
+  {
+    id: 'bullish_engulfing',
+    check: (i) => i.patterns.bullishEngulfing === true,
+    weight: 2.5,
+    reason: 'Bullish engulfing candle pattern'
+  },
+  {
+    id: 'bullish_candle_close',
+    check: (i) => i.close > i.open,
+    weight: 1,
+    reason: 'Bullish candle close'
+  },
+
+  // ============================
+  // 📌 Futures-Specific Funding Rate
+  // ============================
   {
     id: 'funding_negative_strong',
-    check: (funding) => funding < -0.02,
+    check: (funding) => funding < -0.01,
     weight: 2,
-    reason: 'Funding rate strongly negative (<-0.02%) - shorts pay longs'
+    reason: 'Strong negative funding (< -0.01%) — shorts paying longs'
   },
   {
-    id: 'funding_negative',
-    check: (funding) => funding < -0.005 && funding >= -0.02,
+    id: 'funding_negative_mild',
+    check: (funding) => funding < -0.002,
     weight: 1,
-    reason: 'Funding rate negative - short bias in market'
+    reason: 'Mild negative funding (< -0.002%) — bearish sentiment'
   }
 ];
 
@@ -104,7 +173,9 @@ const LONG_RULES = [
  * SHORT signal rules with weights and reasons
  */
 const SHORT_RULES = [
-  // RSI Rules
+  // ============================
+  // 📌 RSI & Momentum (Short)
+  // ============================
   {
     id: 'rsi_overbought',
     check: (i) => i.rsi > 70,
@@ -113,67 +184,135 @@ const SHORT_RULES = [
   },
   {
     id: 'rsi_weakening',
-    check: (i) => i.rsi >= 60 && i.rsi <= 70,
+    check: (i) => i.rsi <= 70 && i.rsi > 55,
     weight: 1.5,
-    reason: 'RSI weakening from overbought (60-70)'
+    reason: 'RSI weakening from overbought (55–70)'
   },
-  
-  // MACD Rules
   {
-    id: 'macd_bearish',
-    check: (i) => i.macd.histogram < 0 && i.macd.line < i.macd.signal,
+    id: 'rsi_bearish_divergence',
+    check: (i) => i.rsi < i.prev.rsi && i.price.high > i.prev.price.high,
+    weight: 2.5,
+    reason: 'Bearish RSI divergence (RSI dropping while price makes higher high)'
+  },
+  {
+    id: 'rsi_below_50',
+    check: (i) => i.rsi < 50,
+    weight: 1,
+    reason: 'RSI < 50 indicates bearish momentum structure'
+  },
+
+  // ============================
+  // 📌 MACD Trend Shift
+  // ============================
+  {
+    id: 'macd_bearish_crossover',
+    check: (i) => i.macd.line < i.macd.signal && i.prev.macd.line >= i.prev.macd.signal,
+    weight: 2.5,
+    reason: 'MACD bearish crossover'
+  },
+  {
+    id: 'macd_histogram_decreasing',
+    check: (i) => i.macd.histogram < i.prev.macd.histogram,
     weight: 2,
-    reason: 'MACD bearish crossover confirmed'
+    reason: 'MACD histogram momentum decreasing'
   },
   {
-    id: 'macd_momentum_decreasing',
+    id: 'macd_histogram_negative',
     check: (i) => i.macd.histogram < 0,
-    weight: 1.5,
-    reason: 'MACD histogram negative (bearish momentum)'
+    weight: 1,
+    reason: 'MACD histogram negative (bearish pressure)'
   },
-  
-  // EMA Rules
+
+  // ============================
+  // 📌 EMA Trend Confirmation
+  // ============================
   {
-    id: 'price_below_ema',
+    id: 'price_below_ema50',
     check: (i, price) => price < i.ema50,
     weight: 1.5,
     reason: 'Price below EMA50 (downtrend)'
   },
   {
-    id: 'price_near_ema_resistance',
-    check: (i, price) => price > i.ema50 && (price - i.ema50) / price < 0.02,
+    id: 'ema50_downtrend',
+    check: (i) => i.ema50 < i.ema200,
     weight: 2,
-    reason: 'Price near EMA50 resistance (within 2%)'
+    reason: 'EMA50 below EMA200 (macro downtrend)'
   },
-  
-  // Volume Rules
+  {
+    id: 'price_near_ema_resistance',
+    check: (i, price) =>
+      price > i.ema50 &&
+      (price - i.ema50) / price < 0.02,
+    weight: 2,
+    reason: 'Price near EMA50 resistance (<2%)'
+  },
+  {
+    id: 'ema_rejection',
+    check: (i, price) =>
+      price < i.ema50 && i.prev.price >= i.prev.ema50,
+    weight: 2,
+    reason: 'Price rejected from EMA50 after attempt to reclaim'
+  },
+
+  // ============================
+  // 📌 Volume Confirmation
+  // ============================
   {
     id: 'volume_spike',
     check: (i) => i.volumeRatio > 1.5,
-    weight: 1.5,
-    reason: 'Volume spike >1.5x average'
+    weight: 2,
+    reason: 'Volume spike (>1.5x average)'
   },
   {
-    id: 'volume_strong',
+    id: 'volume_above_average',
     check: (i) => i.volumeRatio > 1.2,
     weight: 1,
-    reason: 'Above average volume >1.2x'
+    reason: 'Above-average volume (>1.2x)'
   },
-  
-  // Funding Rate Rules (Futures)
+
+  // ============================
+  // 📌 Volatility Filter (Optional but valuable)
+  // ============================
+  {
+    id: 'low_volatility_pullback',
+    check: (i) => i.atrPercent < 2.5,
+    weight: 1,
+    reason: 'Low volatility bounce — cleaner short entries'
+  },
+
+  // ============================
+  // 📌 Candle Confirmation (Short)
+  // ============================
+  {
+    id: 'bearish_engulfing',
+    check: (i) => i.patterns.bearishEngulfing === true,
+    weight: 2.5,
+    reason: 'Bearish engulfing candle pattern'
+  },
+  {
+    id: 'bearish_candle_close',
+    check: (i) => i.close < i.open,
+    weight: 1,
+    reason: 'Bearish candle close'
+  },
+
+  // ============================
+  // 📌 Futures Funding Rate (Short)
+  // ============================
   {
     id: 'funding_positive_strong',
-    check: (funding) => funding > 0.02,
+    check: (funding) => funding > 0.01,
     weight: 2,
-    reason: 'Funding rate strongly positive (>0.02%) - longs pay shorts'
+    reason: 'Strong positive funding (>0.01%) — longs paying shorts'
   },
   {
-    id: 'funding_positive',
-    check: (funding) => funding > 0.005 && funding <= 0.02,
+    id: 'funding_positive_mild',
+    check: (funding) => funding > 0.002,
     weight: 1,
-    reason: 'Funding rate positive - long bias in market'
+    reason: 'Mild positive funding (>0.002%) — bullish bias in market'
   }
 ];
+
 
 /**
  * Get or create exchange instance
@@ -195,7 +334,7 @@ function getExchange() {
  * @param {number} limit - Number of candles to fetch
  * @returns {Array} Array of candle objects [{timestamp, open, high, low, close, volume}, ...]
  */
-export async function fetchOHLCV(symbol, timeframe, limit = 100) {
+export async function fetchOHLCV(symbol, timeframe, limit = 200) {
   // Default to configured timeframe if not provided
   if (!timeframe) {
     timeframe = process.env.TIMEFRAME || '4h';
@@ -424,9 +563,9 @@ export async function runDisqualifiers(symbol, candles, currentPrice) {
  * @returns {Object|null} Latest indicator values or null if insufficient data
  */
 export function calculateIndicators(candles) {
-  // Need at least 50 candles for EMA50
-  if (!candles || candles.length < 50) {
-    console.warn('⚠️  Insufficient data for indicators (need at least 50 candles)');
+  // Need at least 200 candles for EMA200
+  if (!candles || candles.length < 200) {
+    console.warn('⚠️  Insufficient data for indicators (need at least 200 candles)');
     return null;
   }
 
@@ -435,6 +574,7 @@ export function calculateIndicators(candles) {
   const volumes = candles.map(c => c.volume);
   const highPrices = candles.map(c => c.high);
   const lowPrices = candles.map(c => c.low);
+  const openPrices = candles.map(c => c.open);
 
   // Calculate RSI (period 14)
   const rsiValues = RSI.calculate({
@@ -442,6 +582,7 @@ export function calculateIndicators(candles) {
     period: 14
   });
   const rsi = rsiValues.length > 0 ? rsiValues[rsiValues.length - 1] : null;
+  const prevRsi = rsiValues.length > 1 ? rsiValues[rsiValues.length - 2] : null;
 
   // Calculate MACD (fast 12, slow 26, signal 9)
   const macdValues = MACD.calculate({
@@ -453,6 +594,7 @@ export function calculateIndicators(candles) {
     SimpleMASignal: false
   });
   const latestMacd = macdValues.length > 0 ? macdValues[macdValues.length - 1] : null;
+  const prevMacd = macdValues.length > 1 ? macdValues[macdValues.length - 2] : null;
 
   // Calculate EMA50
   const ema50Values = EMA.calculate({
@@ -460,6 +602,14 @@ export function calculateIndicators(candles) {
     period: 50
   });
   const ema50 = ema50Values.length > 0 ? ema50Values[ema50Values.length - 1] : null;
+  const prevEma50 = ema50Values.length > 1 ? ema50Values[ema50Values.length - 2] : null;
+
+  // Calculate EMA200
+  const ema200Values = EMA.calculate({
+    values: closePrices,
+    period: 200
+  });
+  const ema200 = ema200Values.length > 0 ? ema200Values[ema200Values.length - 1] : null;
 
   // Calculate volume average (20-period SMA)
   const volumeAvgValues = SMA.calculate({
@@ -472,6 +622,35 @@ export function calculateIndicators(candles) {
   const latestVolume = volumes[volumes.length - 1];
   const volumeRatio = volumeAvg ? latestVolume / volumeAvg : null;
 
+  // Calculate ATR(14) and ATR percentage
+  const atrValues = ATR.calculate({
+    high: highPrices,
+    low: lowPrices,
+    close: closePrices,
+    period: 14
+  });
+  const latestATR = atrValues.length > 0 ? atrValues[atrValues.length - 1] : null;
+  const currentPrice = closePrices[closePrices.length - 1];
+  const atrPercent = latestATR ? (latestATR / currentPrice) * 100 : null;
+
+  // Get current and previous candle data
+  const currentCandle = candles[candles.length - 1];
+  const prevCandle = candles[candles.length - 2];
+
+  // Detect bullish engulfing pattern
+  const bullishEngulfing = 
+    prevCandle.close < prevCandle.open && // Previous candle was bearish
+    currentCandle.close > currentCandle.open && // Current candle is bullish
+    currentCandle.open < prevCandle.close && // Current opens below previous close
+    currentCandle.close > prevCandle.open; // Current closes above previous open
+
+  // Detect bearish engulfing pattern
+  const bearishEngulfing = 
+    prevCandle.close > prevCandle.open && // Previous candle was bullish
+    currentCandle.close < currentCandle.open && // Current candle is bearish
+    currentCandle.open > prevCandle.close && // Current opens above previous close
+    currentCandle.close < prevCandle.open; // Current closes below previous open
+
   // Round all values to 2 decimal places
   return {
     rsi: rsi ? parseFloat(rsi.toFixed(2)) : null,
@@ -481,8 +660,36 @@ export function calculateIndicators(candles) {
       line: parseFloat(latestMacd.MACD.toFixed(2))
     } : null,
     ema50: ema50 ? parseFloat(ema50.toFixed(2)) : null,
+    ema200: ema200 ? parseFloat(ema200.toFixed(2)) : null,
     volumeAvg: volumeAvg ? parseFloat(volumeAvg.toFixed(2)) : null,
-    volumeRatio: volumeRatio ? parseFloat(volumeRatio.toFixed(2)) : null
+    volumeRatio: volumeRatio ? parseFloat(volumeRatio.toFixed(2)) : null,
+    atrPercent: atrPercent ? parseFloat(atrPercent.toFixed(2)) : null,
+    // Current candle data
+    open: currentCandle.open,
+    close: currentCandle.close,
+    high: currentCandle.high,
+    low: currentCandle.low,
+    // Price data for divergence checks
+    price: {
+      low: currentCandle.low,
+      high: currentCandle.high
+    },
+    // Pattern detection
+    patterns: {
+      bullishEngulfing,
+      bearishEngulfing
+    },
+    // Previous values for comparison
+    prev: {
+      rsi: prevRsi ? parseFloat(prevRsi.toFixed(2)) : null,
+      macd: prevMacd ? {
+        histogram: parseFloat(prevMacd.histogram.toFixed(2)),
+        signal: parseFloat(prevMacd.signal.toFixed(2)),
+        line: parseFloat(prevMacd.MACD.toFixed(2))
+      } : null,
+      ema50: prevEma50 ? parseFloat(prevEma50.toFixed(2)) : null,
+      price: prevCandle ? prevCandle.close : null
+    }
   };
 }
 
@@ -573,8 +780,8 @@ export async function generateSignal(symbol, indicators, candles, currentPrice, 
   const longScore = scoreSignal(indicators, currentPrice, fundingRate, 'LONG');
   const shortScore = scoreSignal(indicators, currentPrice, fundingRate, 'SHORT');
 
-  // Determine best direction (must have score >= 7)
-  const THRESHOLD = 7;
+  // Determine best direction (must have score >= THRESHOLD)
+  const THRESHOLD = parseFloat(process.env.SCORE_THRESHOLD) || 7;
   let signal = null;
 
   if (longScore.score >= THRESHOLD && longScore.score > shortScore.score) {
@@ -821,7 +1028,7 @@ export async function testSignal() {
       const shortScore = scoreSignal(indicators, currentPrice, fundingRate, 'SHORT');
       console.log(`   LONG Score:  ${longScore.score}/${longScore.maxScore}`);
       console.log(`   SHORT Score: ${shortScore.score}/${shortScore.maxScore}`);
-      console.log(`   Threshold: 7.0`);
+      console.log(`   Threshold: ${THRESHOLD}`);
       console.log('');
     }
     
@@ -905,8 +1112,9 @@ export async function testIndicators() {
  * Test signal generation for all configured tokens
  */
 export async function testSignals() {
+  const THRESHOLD = parseFloat(process.env.SCORE_THRESHOLD) || 7;
   console.log('🎯 Testing signal generation for all tokens...\n');
-  console.log('Threshold: Score ≥ 7 required for signal\n');
+  console.log(`Threshold: Score ≥ ${THRESHOLD} required for signal\n`);
   console.log('═'.repeat(80));
   
   const tokens = process.env.TOKENS.split(',').map(t => t.trim());
