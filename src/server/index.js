@@ -344,9 +344,9 @@ app.get('/api/logs', (req, res) => {
     
     const logContent = fs.readFileSync(logFile, 'utf-8');
     const lines = logContent.split('\n').filter(line => line.trim());
-    const last50 = lines.slice(-50);
+    const last100 = lines.slice(-100);
     
-    res.json({ success: true, data: last50 });
+    res.json({ success: true, data: last100 });
   } catch (error) {
     console.error('Error reading logs:', error);
     res.status(500).json({ success: false, error: error.message });
