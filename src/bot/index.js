@@ -13,17 +13,14 @@ console.log('📊 Exchange:', process.env.EXCHANGE);
 console.log('🪙 Tokens:', process.env.TOKENS);
 console.log('⏰ Timeframe:', process.env.TIMEFRAME);
 console.log('🧪 Paper Trading:', process.env.PAPER_TRADING);
-console.log('🚦 Max Open Trades:', process.env.MAX_OPEN_TRADES || 1);
-console.log('🔒 Hourly scanning enabled with daily lockout');
+console.log('🚦 Max Signals Per Day:', process.env.MAX_OPEN_TRADES || 1);
+console.log('⏰ Hourly scanning enabled with daily limit');
 console.log('═'.repeat(70));
 console.log('');
 
 // ============================================================================
 // DAILY LOCKOUT SYSTEM
 // ============================================================================
-
-// Track if signal was sent today (resets at 00:00 UTC)
-let signalSentToday = false;
 
 // Track daily trade count (independent of whether trades are closed)
 let dailyTradeCount = 0;
@@ -32,21 +29,17 @@ let dailyTradeCount = 0;
  * Reset the daily lock at 00:00 UTC
  */
 function resetDailyLock() {
-  signalSentToday = false;
   dailyTradeCount = 0;
-  console.log('🔓 Daily lock reset at 00:00 UTC - scanning resumes');
-  console.log('🔢 Daily trade counter reset to 0');
+  console.log('🔓 Daily trade counter reset at 00:00 UTC');
 }
 
 /**
  * Manually reset the lock (for /reset command)
  */
 export function manualResetLock() {
-  signalSentToday = false;
   dailyTradeCount = 0;
-  console.log('🔓 Manual lock reset via /reset command');
-  console.log('🔢 Daily trade counter reset to 0');
-  return '✅ Daily lock cleared and trade counter reset. Scanning will resume on next hourly check.';
+  console.log('🔓 Manual trade counter reset via /reset command');
+  return '✅ Daily trade counter reset. Scanning will resume on next hourly check.';
 }
 
 // ============================================================================
@@ -61,13 +54,6 @@ async function dailyScan() {
   console.log('\n🔍 Starting hourly market scan...');
   console.log(`⏰ Scan time: ${startTime.toLocaleString()} (${startTime.toISOString()})`);
   console.log('═'.repeat(70));
-  
-  // Check if signal already sent today
-  if (signalSentToday) {
-    console.log('🔒 Signal already sent today. Skipping.');
-    console.log('💡 Next scan will occur at 00:00 UTC or use /reset command\n');
-    return;
-  }
   
   // Check max daily trades
   const maxDailyTrades = parseInt(process.env.MAX_OPEN_TRADES || '1');
@@ -161,9 +147,6 @@ async function dailyScan() {
             // Increment daily trade counter
             dailyTradeCount++;
             
-            // Set lock - first qualifying signal stops further alerts for the day
-            signalSentToday = true;
-            console.log(`   🔒 Daily lock activated - no more signals until 00:00 UTC`);
             console.log(`   🔢 Daily trade count: ${dailyTradeCount}/${maxDailyTrades}`);
             
             // Break loop after first signal is successfully sent
@@ -182,9 +165,6 @@ async function dailyScan() {
             // Increment daily trade counter
             dailyTradeCount++;
             
-            // Set lock - first qualifying signal stops further alerts for the day
-            signalSentToday = true;
-            console.log(`   🔒 Daily lock activated - no more signals until 00:00 UTC`);
             console.log(`   🔢 Daily trade count: ${dailyTradeCount}/${maxDailyTrades}`);
             
             // Break loop after first signal is successfully sent
