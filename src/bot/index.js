@@ -152,17 +152,23 @@ async function dailyScan() {
         if (paperTrading) {
           console.log(`   📝 PAPER TRADING MODE - Signal logged (no Telegram alert)`);
           // Still log to database via sendSignal, but it won't send to Telegram
-          await sendSignal(signal);
-          signalsGenerated++;
-          generatedSignals.push(signal);
+          const sent = await sendSignal(signal);
           
-          // Increment daily trade counter
-          dailyTradeCount++;
-          
-          // Set lock - first qualifying signal stops further alerts for the day
-          signalSentToday = true;
-          console.log(`   🔒 Daily lock activated - no more signals until 00:00 UTC`);
-          console.log(`   🔢 Daily trade count: ${dailyTradeCount}/${maxDailyTrades}`);
+          if (sent) {
+            signalsGenerated++;
+            generatedSignals.push(signal);
+            
+            // Increment daily trade counter
+            dailyTradeCount++;
+            
+            // Set lock - first qualifying signal stops further alerts for the day
+            signalSentToday = true;
+            console.log(`   🔒 Daily lock activated - no more signals until 00:00 UTC`);
+            console.log(`   🔢 Daily trade count: ${dailyTradeCount}/${maxDailyTrades}`);
+            
+            // Break loop after first signal is successfully sent
+            break;
+          }
         } else {
           // Live mode - send to Telegram
           console.log(`   📱 Sending to Telegram...`);
@@ -180,13 +186,13 @@ async function dailyScan() {
             signalSentToday = true;
             console.log(`   🔒 Daily lock activated - no more signals until 00:00 UTC`);
             console.log(`   🔢 Daily trade count: ${dailyTradeCount}/${maxDailyTrades}`);
+            
+            // Break loop after first signal is successfully sent
+            break;
           } else {
-            console.log(`   ⚠️  Failed to send alert`);
+            console.log(`   ⚠️  Failed to send alert - continuing to next token`);
           }
         }
-        
-        // Break loop after first signal is sent
-        break;
         
       } else {
         console.log(`   ⏸️  No signal - score below threshold`);
