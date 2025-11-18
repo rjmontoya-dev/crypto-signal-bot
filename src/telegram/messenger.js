@@ -201,6 +201,22 @@ export function closeTradeManually(signalId, outcome, pnlPercent) {
 // ============================================================================
 
 /**
+ * Escape HTML special characters
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
+ */
+function escapeHtml(text) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
+}
+
+/**
  * Format a signal for Telegram display
  * @param {Object} signal - Signal object from generateSignal()
  * @returns {string} Formatted message text
@@ -219,7 +235,7 @@ function formatSignalMessage(signal) {
   message += `<b>Confluences:</b>\n`;
   
   signal.reasons.forEach(reason => {
-    message += `• ${reason}\n`;
+    message += `• ${escapeHtml(reason)}\n`;
   });
   
   message += `\n🕐 ${new Date(signal.timestamp).toLocaleString()}`;
