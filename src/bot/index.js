@@ -102,7 +102,7 @@ async function dailyScan() {
     try {
       // Fetch market data
       console.log(`   🔄 Fetching ${timeframe} candles...`);
-      const candles = await fetchOHLCV(token, timeframe, 100);
+      const candles = await fetchOHLCV(token, timeframe, 200);
       
       if (candles.length === 0) {
         console.log(`   ⚠️  No data available for ${token}`);

@@ -971,7 +971,7 @@ export async function testSignal() {
   try {
     // Fetch market data
     console.log('🔍 Fetching data...');
-    const candles = await fetchOHLCV(symbol, timeframe, 100);
+    const candles = await fetchOHLCV(symbol, timeframe, 200);
     
     if (candles.length === 0) {
       console.log('❌ No data available\n');
@@ -1053,7 +1053,7 @@ export async function testIndicators() {
   try {
     // Fetch candle data
     console.log(`🔍 Fetching ${timeframe} candles for ${symbol}...`);
-    const candles = await fetchOHLCV(symbol, timeframe, 100);
+    const candles = await fetchOHLCV(symbol, timeframe, 200);
     
     if (candles.length === 0) {
       console.log('❌ No data returned');
@@ -1127,7 +1127,7 @@ export async function testSignals() {
     
     try {
       // Fetch data
-      const candles = await fetchOHLCV(token, timeframe, 100);
+      const candles = await fetchOHLCV(token, timeframe, 200);
       if (candles.length === 0) {
         console.log(`   ❌ No data available`);
         continue;
@@ -1212,7 +1212,7 @@ export async function testDataFetch() {
   for (const token of tokens) {
     try {
       // Fetch candles
-      const candles = await fetchOHLCV(token, timeframe, 100);
+      const candles = await fetchOHLCV(token, timeframe, 200);
       
       // Fetch funding rate
       const funding = await getFundingRate(token);
