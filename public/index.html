@@ -14,8 +14,12 @@
     <header class="header">
       <h1>🤖 Crypto Signal Bot Dashboard</h1>
       <div class="header-actions">
+        <button @click="toggleCron()" :class="cronEnabled ? 'btn-warning' : 'btn-success'" class="btn">
+          <span x-show="cronEnabled">⏸️ Disable Auto Scan</span>
+          <span x-show="!cronEnabled">▶️ Enable Auto Scan</span>
+        </button>
         <button @click="triggerScan()" :disabled="scanning" class="btn btn-primary">
-          <span x-show="!scanning">🔍 Force Scan Now</span>
+          <span x-show="!scanning">🔍 Manual Scan</span>
           <span x-show="scanning">⏳ Scanning...</span>
         </button>
         <button @click="resetLock()" class="btn btn-secondary">🔓 Reset Daily Lock</button>

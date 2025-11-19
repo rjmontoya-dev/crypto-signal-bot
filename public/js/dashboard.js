@@ -10,6 +10,7 @@ function dashboard() {
     },
     config: {},
     logs: [],
+    cronEnabled: true,
     filters: {
       outcome: 'all',
       status: '',
@@ -40,6 +41,7 @@ function dashboard() {
 
     async init() {
       await this.refreshData();
+      await this.fetchCronStatus();
       // Auto-refresh every 30 seconds
       setInterval(() => this.refreshData(), 30000);
     },
@@ -48,7 +50,8 @@ function dashboard() {
       await Promise.all([
         this.fetchSignals(),
         this.fetchStats(),
-        this.fetchConfig()
+        this.fetchConfig(),
+        this.fetchCronStatus()
       ]);
     },
 
@@ -123,7 +126,7 @@ function dashboard() {
         const data = await response.json();
         
         if (data.success) {
-          this.showToast('Scan triggered! Check logs for progress.', 'success');
+          this.showToast('Manual scan triggered! Check logs for progress.', 'success');
           // Refresh signals after 5 seconds
           setTimeout(() => this.refreshData(), 5000);
         } else {
@@ -134,6 +137,41 @@ function dashboard() {
         this.showToast('Failed to trigger scan', 'error');
       } finally {
         this.scanning = false;
+      }
+    },
+
+    async fetchCronStatus() {
+      try {
+        const response = await fetch('/api/cron-status');
+        const data = await response.json();
+        
+        if (data.success) {
+          this.cronEnabled = data.enabled;
+        }
+      } catch (error) {
+        console.error('Error fetching cron status:', error);
+      }
+    },
+
+    async toggleCron() {
+      try {
+        const newState = !this.cronEnabled;
+        const response = await fetch('/api/cron-toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: newState })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          this.cronEnabled = data.enabled;
+          this.showToast(data.message, 'success');
+        } else {
+          this.showToast('Failed to toggle cron: ' + data.error, 'error');
+        }
+      } catch (error) {
+        console.error('Error toggling cron:', error);
+        this.showToast('Failed to toggle automated scans', 'error');
       }
     },
 

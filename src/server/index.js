@@ -263,6 +263,50 @@ app.post('/api/scan', async (req, res) => {
 });
 
 /**
+ * GET /api/cron-status - Get cron job status
+ */
+app.get('/api/cron-status', async (req, res) => {
+  try {
+    const botModule = await import('../bot/index.js');
+    
+    if (botModule.getCronStatus) {
+      const status = botModule.getCronStatus();
+      res.json({ success: true, ...status });
+    } else {
+      res.status(501).json({ success: false, error: 'Cron status not available' });
+    }
+  } catch (error) {
+    console.error('Error getting cron status:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/cron-toggle - Enable/disable automated scans
+ * Body: { enabled: boolean }
+ */
+app.post('/api/cron-toggle', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    const botModule = await import('../bot/index.js');
+    
+    if (enabled === undefined || enabled === null) {
+      return res.status(400).json({ success: false, error: 'Missing required field: enabled' });
+    }
+    
+    if (botModule.enableCron && botModule.disableCron) {
+      const result = enabled ? botModule.enableCron() : botModule.disableCron();
+      res.json(result);
+    } else {
+      res.status(501).json({ success: false, error: 'Cron toggle not available' });
+    }
+  } catch (error) {
+    console.error('Error toggling cron:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * POST /api/close-trade - Manually close a trade
  * Body: { signalId: number, outcome: 'win' | 'loss' | 'skip', pnlPercent: number (optional for skip) }
  */

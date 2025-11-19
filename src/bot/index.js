@@ -25,6 +25,36 @@ console.log('');
 // Track daily trade count (independent of whether trades are closed)
 let dailyTradeCount = 0;
 
+// Track cron job state
+let cronEnabled = true;
+let hourlyScanTask = null;
+let dailyResetTask = null;
+
+/**
+ * Get cron status
+ */
+export function getCronStatus() {
+  return { enabled: cronEnabled };
+}
+
+/**
+ * Enable cron jobs
+ */
+export function enableCron() {
+  cronEnabled = true;
+  console.log('✅ Automated scans ENABLED');
+  return { success: true, enabled: true, message: 'Automated scans enabled' };
+}
+
+/**
+ * Disable cron jobs
+ */
+export function disableCron() {
+  cronEnabled = false;
+  console.log('⏸️  Automated scans DISABLED (manual scans still available)');
+  return { success: true, enabled: false, message: 'Automated scans disabled. Use manual scan button.' };
+}
+
 /**
  * Reset the daily lock at 00:00 UTC
  */
@@ -49,9 +79,16 @@ export function manualResetLock() {
 /**
  * Daily market scan - checks all tokens for trading signals
  */
-async function dailyScan() {
+async function dailyScan(isManual = false) {
   const startTime = new Date();
-  console.log('\n🔍 Starting hourly market scan...');
+  
+  // Check if cron is enabled (only for automated scans)
+  if (!isManual && !cronEnabled) {
+    console.log('⏸️  Automated scan skipped (cron disabled). Use manual scan or enable cron.');
+    return;
+  }
+  
+  console.log(isManual ? '\n🎯 Starting MANUAL market scan...' : '\n🔍 Starting hourly market scan...');
   console.log(`⏰ Scan time: ${startTime.toLocaleString()} (${startTime.toISOString()})`);
   console.log('═'.repeat(70));
   
@@ -222,7 +259,7 @@ async function dailyScan() {
  */
 export function triggerManualScan() {
   console.log('🎯 Manual scan triggered from UI');
-  dailyScan().catch(error => {
+  dailyScan(true).catch(error => {
     console.error('❌ Manual scan failed:', error);
   });
 }
@@ -249,9 +286,9 @@ async function startBot() {
   
   // Schedule hourly scan
   console.log('⏰ Setting up hourly scan schedule...');
-  cron.schedule('0 * * * *', async () => {
+  hourlyScanTask = cron.schedule('0 * * * *', async () => {
     console.log('\n⏰ Hourly scan triggered');
-    await dailyScan();
+    await dailyScan(false);
   }, {
     timezone: 'UTC'
   });
@@ -260,7 +297,7 @@ async function startBot() {
   
   // Schedule daily lock reset at 00:00 UTC
   console.log('🔒 Setting up daily lock reset...');
-  cron.schedule('0 0 * * *', () => {
+  dailyResetTask = cron.schedule('0 0 * * *', () => {
     resetDailyLock();
   }, {
     timezone: 'UTC'
@@ -279,7 +316,7 @@ async function startBot() {
   
   // Run immediate scan for testing
   console.log('\n🧪 Running immediate scan for testing...');
-  await dailyScan();
+  await dailyScan(true);
   
   console.log('\n✅ Bot is now running. Waiting for scheduled scans...');
   console.log('💡 Press Ctrl+C to stop the bot\n');
