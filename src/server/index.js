@@ -47,8 +47,8 @@ app.get('/api/signals', (req, res) => {
     const database = getDatabase();
     const { status, outcome, symbol, sort = 'created_at', order = 'DESC', page = 1, pageSize = 10 } = req.query;
     
-    let query = 'SELECT * FROM signals WHERE 1=1';
-    const params = [];
+    let query = 'SELECT * FROM signals WHERE status != ?';
+    const params = ['skipped'];
     
     // Apply filters
     if (status) {
@@ -120,37 +120,37 @@ app.get('/api/stats', (req, res) => {
   try {
     const database = getDatabase();
     
-    // Total signals
-    const totalSignals = database.prepare('SELECT COUNT(*) as count FROM signals').get().count;
+    // Total signals (excluding skipped)
+    const totalSignals = database.prepare('SELECT COUNT(*) as count FROM signals WHERE status != ?').get('skipped').count;
     
-    // Completed trades (with outcomes)
+    // Completed trades (with outcomes, excluding skipped)
     const completedTrades = database.prepare(`
-      SELECT COUNT(*) as count FROM signals WHERE outcome IS NOT NULL
-    `).get().count;
+      SELECT COUNT(*) as count FROM signals WHERE outcome IS NOT NULL AND status != ?
+    `).get('skipped').count;
     
-    // Open trades
+    // Open trades (excluding skipped)
     const openTrades = database.prepare(`
-      SELECT COUNT(*) as count FROM signals WHERE outcome IS NULL
-    `).get().count;
+      SELECT COUNT(*) as count FROM signals WHERE outcome IS NULL AND status != ?
+    `).get('skipped').count;
     
-    // Win/Loss stats
+    // Win/Loss stats (excluding skipped)
     const wins = database.prepare(`
-      SELECT COUNT(*) as count FROM signals WHERE outcome = 'win'
-    `).get().count;
+      SELECT COUNT(*) as count FROM signals WHERE outcome = 'win' AND status != ?
+    `).get('skipped').count;
     
     const losses = database.prepare(`
-      SELECT COUNT(*) as count FROM signals WHERE outcome = 'loss'
-    `).get().count;
+      SELECT COUNT(*) as count FROM signals WHERE outcome = 'loss' AND status != ?
+    `).get('skipped').count;
     
     const winRate = completedTrades > 0 ? ((wins / completedTrades) * 100).toFixed(1) : 0;
     
-    // Average PnL
+    // Average PnL (excluding skipped)
     const avgPnlResult = database.prepare(`
-      SELECT AVG(pnl_percent) as avg FROM signals WHERE pnl_percent IS NOT NULL
-    `).get();
+      SELECT AVG(pnl_percent) as avg FROM signals WHERE pnl_percent IS NOT NULL AND status != ?
+    `).get('skipped');
     const avgPnl = avgPnlResult.avg ? parseFloat(avgPnlResult.avg.toFixed(2)) : 0;
     
-    // Per-token stats
+    // Per-token stats (excluding skipped)
     const tokenStats = database.prepare(`
       SELECT 
         symbol,
@@ -159,32 +159,32 @@ app.get('/api/stats', (req, res) => {
         SUM(CASE WHEN outcome = 'loss' THEN 1 ELSE 0 END) as losses,
         AVG(pnl_percent) as avg_pnl
       FROM signals
-      WHERE outcome IS NOT NULL
+      WHERE outcome IS NOT NULL AND status != ?
       GROUP BY symbol
       ORDER BY total DESC
-    `).all();
+    `).all('skipped');
     
-    // Direction stats
+    // Direction stats (excluding skipped)
     const longStats = database.prepare(`
       SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN outcome = 'win' THEN 1 ELSE 0 END) as wins
       FROM signals
-      WHERE direction = 'LONG' AND outcome IS NOT NULL
-    `).get();
+      WHERE direction = 'LONG' AND outcome IS NOT NULL AND status != ?
+    `).get('skipped');
     
     const shortStats = database.prepare(`
       SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN outcome = 'win' THEN 1 ELSE 0 END) as wins
       FROM signals
-      WHERE direction = 'SHORT' AND outcome IS NOT NULL
-    `).get();
+      WHERE direction = 'SHORT' AND outcome IS NOT NULL AND status != ?
+    `).get('skipped');
     
-    // Rule effectiveness (top performing confluences on wins)
+    // Rule effectiveness (top performing confluences on wins, excluding skipped)
     const allWins = database.prepare(`
-      SELECT reasons FROM signals WHERE outcome = 'win'
-    `).all();
+      SELECT reasons FROM signals WHERE outcome = 'win' AND status != ?
+    `).all('skipped');
     
     const ruleCount = {};
     allWins.forEach(trade => {
@@ -381,7 +381,7 @@ app.get('/api/config', (req, res) => {
 app.get('/api/export-csv', (req, res) => {
   try {
     const database = getDatabase();
-    const signals = database.prepare('SELECT * FROM signals ORDER BY created_at DESC').all();
+    const signals = database.prepare('SELECT * FROM signals WHERE status != ? ORDER BY created_at DESC').all('skipped');
     
     // CSV header
     let csv = 'ID,Symbol,Direction,Entry,Take Profit,Stop Loss,Score,Max Score,Status,Outcome,PnL %,Created At\n';
