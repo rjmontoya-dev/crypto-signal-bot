@@ -414,7 +414,7 @@ app.post('/api/signals/:id/toggle-status', async (req, res) => {
     
     const result = database.prepare(`
       UPDATE signals 
-      SET status = ?, updated_at = CURRENT_TIMESTAMP 
+      SET status = ? 
       WHERE id = ?
     `).run(status, id);
 
