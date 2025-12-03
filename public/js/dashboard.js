@@ -189,6 +189,19 @@ function dashboard() {
           this.telegramEnabled = data.enabled;
         }
       } catch (error) {
+        console.error('Error fetching Telegram status:', error);
+      }
+    },
+
+    async fetchTelegramStatus() {
+      try {
+        const response = await fetch('/api/telegram-status');
+        const data = await response.json();
+        
+        if (data.success) {
+          this.telegramEnabled = data.enabled;
+        }
+      } catch (error) {
         console.error('Error fetching telegram status:', error);
       }
     },
@@ -234,6 +247,32 @@ function dashboard() {
       } catch (error) {
         console.error('Error toggling Telegram:', error);
         this.showToast('Failed to toggle Telegram notifications', 'error');
+      }
+    },
+
+    async toggleSignalStatus(signal) {
+      const newStatus = signal.status === 'taken' ? 'not_taken' : 'taken';
+      
+      try {
+        const response = await fetch(`/api/signals/${signal.id}/toggle-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ status: newStatus })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          this.showToast(`Signal marked as ${newStatus === 'taken' ? 'Taken ✅' : 'Not Taken ⏸️'}`, 'success');
+          await this.refreshData();
+        } else {
+          this.showToast('Failed to update status: ' + data.error, 'error');
+        }
+      } catch (error) {
+        console.error('Error toggling signal status:', error);
+        this.showToast('Failed to update status', 'error');
       }
     },
 

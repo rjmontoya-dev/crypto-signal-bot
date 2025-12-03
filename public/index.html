@@ -163,7 +163,10 @@
                   <small x-text="'(' + Math.round((signal.score / signal.max_score) * 100) + '%)'"></small>
                 </td>
                 <td>
-                  <span class="badge badge-status" x-text="signal.status || 'pending'"></span>
+                  <label class="toggle-switch" @click="toggleSignalStatus(signal)">
+                    <input type="checkbox" :checked="signal.status === 'taken'" disabled>
+                    <span class="toggle-slider"></span>
+                  </label>
                 </td>
                 <td>
                   <span x-show="signal.outcome" class="badge" 

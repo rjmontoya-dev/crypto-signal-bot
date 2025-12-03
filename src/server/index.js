@@ -311,6 +311,50 @@ app.post('/api/cron-toggle', async (req, res) => {
  */
 app.get('/api/telegram-status', async (req, res) => {
   try {
+    const messengerModule = await import('../telegram/messenger.js');
+    
+    if (messengerModule.getTelegramStatus) {
+      const status = messengerModule.getTelegramStatus();
+      res.json({ success: true, ...status });
+    } else {
+      res.status(501).json({ success: false, error: 'Telegram status not available' });
+    }
+  } catch (error) {
+    console.error('Error getting Telegram status:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/telegram-toggle - Enable/disable Telegram notifications
+ * Body: { enabled: boolean }
+ */
+app.post('/api/telegram-toggle', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    const messengerModule = await import('../telegram/messenger.js');
+    
+    if (enabled === undefined || enabled === null) {
+      return res.status(400).json({ success: false, error: 'Missing required field: enabled' });
+    }
+    
+    if (messengerModule.enableTelegram && messengerModule.disableTelegram) {
+      const result = enabled ? messengerModule.enableTelegram() : messengerModule.disableTelegram();
+      res.json(result);
+    } else {
+      res.status(501).json({ success: false, error: 'Telegram toggle not available' });
+    }
+  } catch (error) {
+    console.error('Error toggling Telegram:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/telegram-status - Get Telegram notification status
+ */
+app.get('/api/telegram-status', async (req, res) => {
+  try {
     const botModule = await import('../bot/index.js');
     
     if (botModule.getTelegramStatus) {
@@ -347,6 +391,51 @@ app.post('/api/telegram-toggle', async (req, res) => {
   } catch (error) {
     console.error('Error toggling telegram:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/signals/:id/toggle-status - Toggle signal status between 'taken' and 'not_taken'
+ * Body: { status: 'taken' | 'not_taken' }
+ */
+app.post('/api/signals/:id/toggle-status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['taken', 'not_taken'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid status. Must be "taken" or "not_taken"'
+      });
+    }
+
+    const database = getDatabase();
+    
+    const result = database.prepare(`
+      UPDATE signals 
+      SET status = ?, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `).run(status, id);
+
+    if (result.changes > 0) {
+      res.json({
+        success: true,
+        message: `Signal marked as ${status}`,
+        status
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        error: 'Signal not found'
+      });
+    }
+  } catch (error) {
+    console.error('Error toggling signal status:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 
