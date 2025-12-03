@@ -11,6 +11,7 @@ function dashboard() {
     config: {},
     logs: [],
     cronEnabled: true,
+    telegramEnabled: true,
     selectedTimeframe: '4h',
     filters: {
       outcome: 'all',
@@ -43,6 +44,7 @@ function dashboard() {
     async init() {
       await this.refreshData();
       await this.fetchCronStatus();
+      await this.fetchTelegramStatus();
       // Auto-refresh every 30 seconds
       setInterval(() => this.refreshData(), 30000);
     },
@@ -52,7 +54,8 @@ function dashboard() {
         this.fetchSignals(),
         this.fetchStats(),
         this.fetchConfig(),
-        this.fetchCronStatus()
+        this.fetchCronStatus(),
+        this.fetchTelegramStatus()
       ]);
     },
 
@@ -177,6 +180,19 @@ function dashboard() {
       }
     },
 
+    async fetchTelegramStatus() {
+      try {
+        const response = await fetch('/api/telegram-status');
+        const data = await response.json();
+        
+        if (data.success) {
+          this.telegramEnabled = data.enabled;
+        }
+      } catch (error) {
+        console.error('Error fetching telegram status:', error);
+      }
+    },
+
     async toggleCron() {
       try {
         const newState = !this.cronEnabled;
@@ -196,6 +212,28 @@ function dashboard() {
       } catch (error) {
         console.error('Error toggling cron:', error);
         this.showToast('Failed to toggle automated scans', 'error');
+      }
+    },
+
+    async toggleTelegram() {
+      try {
+        const newState = !this.telegramEnabled;
+        const response = await fetch('/api/telegram-toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: newState })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          this.telegramEnabled = data.enabled;
+          this.showToast(data.message, 'success');
+        } else {
+          this.showToast('Failed to toggle Telegram: ' + data.error, 'error');
+        }
+      } catch (error) {
+        console.error('Error toggling Telegram:', error);
+        this.showToast('Failed to toggle Telegram notifications', 'error');
       }
     },
 

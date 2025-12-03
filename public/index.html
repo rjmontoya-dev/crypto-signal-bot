@@ -18,6 +18,10 @@
           <span x-show="cronEnabled">⏸️ Disable Auto Scan</span>
           <span x-show="!cronEnabled">▶️ Enable Auto Scan</span>
         </button>
+        <button @click="toggleTelegram()" :class="telegramEnabled ? 'btn-warning' : 'btn-success'" class="btn">
+          <span x-show="telegramEnabled">📱 Disable Telegram</span>
+          <span x-show="!telegramEnabled">📱 Enable Telegram</span>
+        </button>
         <button @click="triggerScan()" :disabled="scanning" class="btn btn-primary">
           <span x-show="!scanning">🔍 Manual Scan</span>
           <span x-show="scanning">⏳ Scanning...</span>

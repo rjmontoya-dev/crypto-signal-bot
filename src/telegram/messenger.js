@@ -264,17 +264,24 @@ function createSignalKeyboard(signalId) {
 /**
  * Send a trading signal to Telegram with interactive buttons
  * @param {Object} signal - Signal object from generateSignal()
+ * @param {boolean} shouldSendToTelegram - Whether to send to Telegram or just log to DB
  * @returns {Promise<boolean>} Success status
  */
-export async function sendSignal(signal) {
+export async function sendSignal(signal, shouldSendToTelegram = true) {
   try {
     // Always log signal to database first
     const signalId = logSignal(signal);
     
+    // If Telegram is disabled, just return success after logging
+    if (!shouldSendToTelegram) {
+      console.log('📝 [Telegram disabled] Signal logged to database:', signal.symbol, signal.direction);
+      return true;
+    }
+    
     const telegramBot = getBot();
     if (!telegramBot) {
-      console.log('📱 [Telegram disabled] Signal logged to database:', signal.symbol, signal.direction);
-      return false;
+      console.log('📱 [Telegram not configured] Signal logged to database:', signal.symbol, signal.direction);
+      return true;
     }
     
     // Format message
