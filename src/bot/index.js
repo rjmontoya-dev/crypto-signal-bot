@@ -30,6 +30,37 @@ let cronEnabled = true;
 let hourlyScanTask = null;
 let dailyResetTask = null;
 
+// Track current timeframe (default from env)
+let currentTimeframe = process.env.TIMEFRAME || '4h';
+
+/**
+ * Set timeframe for scanning
+ */
+export function setTimeframe(timeframe) {
+  const validTimeframes = ['30m', '1h', '4h'];
+  if (!validTimeframes.includes(timeframe)) {
+    return { 
+      success: false, 
+      error: 'Invalid timeframe. Must be one of: ' + validTimeframes.join(', ') 
+    };
+  }
+  
+  currentTimeframe = timeframe;
+  console.log(`⏰ Timeframe updated to: ${timeframe}`);
+  return { 
+    success: true, 
+    timeframe: currentTimeframe,
+    message: `Timeframe updated to ${timeframe}` 
+  };
+}
+
+/**
+ * Get current timeframe
+ */
+export function getTimeframe() {
+  return currentTimeframe;
+}
+
 /**
  * Get cron status
  */
@@ -90,6 +121,7 @@ async function dailyScan(isManual = false) {
   
   console.log(isManual ? '\n🎯 Starting MANUAL market scan...' : '\n🔍 Starting hourly market scan...');
   console.log(`⏰ Scan time: ${startTime.toLocaleString()} (${startTime.toISOString()})`);
+  console.log(`📊 Timeframe: ${currentTimeframe}`);
   console.log('═'.repeat(70));
   
   // Check max daily trades
@@ -111,7 +143,7 @@ async function dailyScan(isManual = false) {
   }
   
   const tokens = process.env.TOKENS.split(',').map(t => t.trim());
-  const timeframe = process.env.TIMEFRAME || '4h';
+  const timeframe = currentTimeframe; // Use dynamic timeframe
   
   let scannedCount = 0;
   let signalsGenerated = 0;

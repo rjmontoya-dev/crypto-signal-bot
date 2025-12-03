@@ -11,6 +11,7 @@ function dashboard() {
     config: {},
     logs: [],
     cronEnabled: true,
+    selectedTimeframe: '4h',
     filters: {
       outcome: 'all',
       status: '',
@@ -97,9 +98,32 @@ function dashboard() {
         
         if (data.success) {
           this.config = data.data;
+          this.selectedTimeframe = data.data.timeframe || '4h';
         }
       } catch (error) {
         console.error('Error fetching config:', error);
+      }
+    },
+
+    async updateTimeframe() {
+      try {
+        const response = await fetch('/api/config/timeframe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ timeframe: this.selectedTimeframe })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          this.config.timeframe = this.selectedTimeframe;
+          this.showToast(`Timeframe updated to ${this.selectedTimeframe}`, 'success');
+          await this.fetchConfig();
+        } else {
+          this.showToast('Failed to update timeframe: ' + data.error, 'error');
+        }
+      } catch (error) {
+        console.error('Error updating timeframe:', error);
+        this.showToast('Failed to update timeframe', 'error');
       }
     },
 

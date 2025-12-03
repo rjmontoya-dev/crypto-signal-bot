@@ -375,6 +375,42 @@ app.post('/api/reset-lock', async (req, res) => {
 });
 
 /**
+ * POST /api/config/timeframe - Update scanning timeframe
+ * Body: { timeframe: string }
+ */
+app.post('/api/config/timeframe', async (req, res) => {
+  try {
+    const { timeframe } = req.body;
+    
+    if (!timeframe) {
+      return res.status(400).json({ success: false, error: 'Missing required field: timeframe' });
+    }
+    
+    // Validate timeframe
+    const validTimeframes = ['30m', '1h', '4h'];
+    if (!validTimeframes.includes(timeframe)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid timeframe. Must be one of: ' + validTimeframes.join(', ') 
+      });
+    }
+    
+    // Import setTimeframe from bot
+    const botModule = await import('../bot/index.js');
+    
+    if (botModule.setTimeframe) {
+      const result = botModule.setTimeframe(timeframe);
+      res.json(result);
+    } else {
+      res.status(501).json({ success: false, error: 'Timeframe update not implemented' });
+    }
+  } catch (error) {
+    console.error('Error updating timeframe:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * GET /api/logs - Get recent PM2 logs
  */
 app.get('/api/logs', (req, res) => {
@@ -400,12 +436,16 @@ app.get('/api/logs', (req, res) => {
 /**
  * GET /api/config - Get environment config (read-only)
  */
-app.get('/api/config', (req, res) => {
+app.get('/api/config', async (req, res) => {
   try {
+    // Import getTimeframe from bot to get current runtime timeframe
+    const botModule = await import('../bot/index.js');
+    const currentTimeframe = botModule.getTimeframe ? botModule.getTimeframe() : (process.env.TIMEFRAME || '4h');
+    
     const config = {
       exchange: process.env.EXCHANGE || 'binance',
       tokens: process.env.TOKENS || '',
-      timeframe: process.env.TIMEFRAME || '4h',
+      timeframe: currentTimeframe,
       paperTrading: process.env.PAPER_TRADING === 'true',
       maxOpenTrades: parseInt(process.env.MAX_OPEN_TRADES || '1'),
       telegramConnected: !!process.env.TELEGRAM_BOT_TOKEN,

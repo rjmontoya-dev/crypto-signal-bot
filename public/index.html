@@ -307,13 +307,27 @@
     <div x-show="activeTab === 'config'" class="tab-content">
       <div class="config-section">
         <h3>⚙️ Bot Configuration</h3>
+        
+        <!-- Timeframe Selector -->
+        <div class="config-control">
+          <label for="timeframe-select">
+            <strong>📊 Scanning Timeframe:</strong>
+          </label>
+          <select id="timeframe-select" x-model="selectedTimeframe" @change="updateTimeframe()" class="timeframe-select">
+            <option value="30m">30 Minutes</option>
+            <option value="1h">1 Hour</option>
+            <option value="4h">4 Hours</option>
+          </select>
+          <span class="config-hint">Select the timeframe for market scanning and signal generation</span>
+        </div>
+
         <div class="config-grid">
           <div class="config-item">
             <strong>Exchange:</strong>
             <span x-text="config.exchange"></span>
           </div>
           <div class="config-item">
-            <strong>Timeframe:</strong>
+            <strong>Current Timeframe:</strong>
             <span x-text="config.timeframe"></span>
           </div>
           <div class="config-item">
