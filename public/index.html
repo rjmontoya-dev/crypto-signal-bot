@@ -124,21 +124,20 @@
               <th>ID</th>
               <th>Symbol</th>
               <th>Direction</th>
+              <th>Time Frame</th>
               <th>Entry</th>
               <th>TP</th>
               <th>SL</th>
               <th>Score</th>
               <th>Status</th>
               <th>Outcome</th>
-              <th>PnL %</th>
-              <th>Created</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             <template x-if="signals.length === 0">
               <tr>
-                <td colspan="12" style="text-align: center; padding: 2rem;">
+                <td colspan="11" style="text-align: center; padding: 2rem;">
                   No signals found
                 </td>
               </tr>
@@ -151,6 +150,7 @@
                   <span class="badge" :class="signal.direction === 'LONG' ? 'badge-long' : 'badge-short'" 
                         x-text="signal.direction"></span>
                 </td>
+                <td x-text="signal.timeframe || '1h'"></td>
                 <td x-text="'$' + signal.entry.toLocaleString()"></td>
                 <td x-text="'$' + signal.tp.toLocaleString()"></td>
                 <td x-text="'$' + signal.sl.toLocaleString()"></td>
@@ -171,13 +171,6 @@
                         x-text="signal.outcome"></span>
                   <span x-show="!signal.outcome" class="badge badge-pending">Pending</span>
                 </td>
-                <td>
-                  <span x-show="signal.pnl_percent !== null" 
-                        :class="signal.pnl_percent >= 0 ? 'positive' : 'negative'"
-                        x-text="signal.pnl_percent + '%'"></span>
-                  <span x-show="signal.pnl_percent === null">-</span>
-                </td>
-                <td x-text="formatDate(signal.created_at)"></td>
                 <td>
                   <button @click="viewDetails(signal)" class="btn-icon" title="View Details">👁️</button>
                   <button x-show="!signal.outcome || signal.outcome === 'skip'" @click="openCloseTrade(signal)" class="btn-icon" title="Close Trade">❌</button>
@@ -314,7 +307,12 @@
           </div>
           <div class="config-item">
             <strong>Timeframe:</strong>
-            <span x-text="config.timeframe"></span>
+            <select x-model="config.timeframe" @change="updateTimeframe()" class="config-select">
+              <option value="15m">15 Minutes</option>
+              <option value="1h">1 Hour</option>
+              <option value="4h">4 Hours</option>
+              <option value="1d">1 Day (Daily)</option>
+            </select>
           </div>
           <div class="config-item">
             <strong>Paper Trading:</strong>
@@ -402,7 +400,20 @@
               <strong>Confluences:</strong>
               <ul class="confluences-list">
                 <template x-for="reason in selectedSignal?.reasons" :key="reason">
-                  <li x-text="reason"></li>
+                  <li>
+                    <div class="confluence-item">
+                      <span class="confluence-text" x-text="reason"></span>
+                      <template x-if="getConfluenceWinRate(reason)">
+                        <span class="confluence-stats"
+                              :class="parseFloat(getConfluenceWinRate(reason).winRate) >= 50 ? 'stat-positive' : 'stat-negative'"
+                              x-text="'Win Rate: ' + getConfluenceWinRate(reason).winRate + '% (' + getConfluenceWinRate(reason).wins + '/' + getConfluenceWinRate(reason).total + ')'">
+                        </span>
+                      </template>
+                      <template x-if="!getConfluenceWinRate(reason)">
+                        <span class="confluence-stats stat-neutral">No data yet</span>
+                      </template>
+                    </div>
+                  </li>
                 </template>
               </ul>
             </div>

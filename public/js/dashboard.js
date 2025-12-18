@@ -11,6 +11,7 @@ function dashboard() {
     config: {},
     logs: [],
     cronEnabled: true,
+    confluenceStats: {},
     filters: {
       outcome: 'all',
       status: '',
@@ -51,7 +52,8 @@ function dashboard() {
         this.fetchSignals(),
         this.fetchStats(),
         this.fetchConfig(),
-        this.fetchCronStatus()
+        this.fetchCronStatus(),
+        this.fetchConfluenceStats()
       ]);
     },
 
@@ -100,6 +102,39 @@ function dashboard() {
         }
       } catch (error) {
         console.error('Error fetching config:', error);
+      }
+    },
+
+    async fetchConfluenceStats() {
+      try {
+        const response = await fetch('/api/confluence-stats');
+        const data = await response.json();
+        
+        if (data.success) {
+          this.confluenceStats = data.data;
+        }
+      } catch (error) {
+        console.error('Error fetching confluence stats:', error);
+      }
+    },
+
+    async updateTimeframe() {
+      try {
+        const response = await fetch('/api/config/timeframe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ timeframe: this.config.timeframe })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          this.showToast('Timeframe updated to ' + this.config.timeframe, 'success');
+        } else {
+          this.showToast('Failed to update timeframe: ' + data.error, 'error');
+        }
+      } catch (error) {
+        console.error('Error updating timeframe:', error);
+        this.showToast('Failed to update timeframe', 'error');
       }
     },
 
@@ -258,6 +293,31 @@ function dashboard() {
     formatDate(dateString) {
       const date = new Date(dateString);
       return date.toLocaleString();
+    },
+
+    getConfluenceWinRate(confluence) {
+      // Clean the confluence text to match the key
+      const cleanConfluence = confluence
+        .replace(/✓\s*/, '')
+        .replace(/\s*\[.*?\]/, '')
+        .trim();
+      
+      console.log('Looking for confluence:', cleanConfluence);
+      console.log('Available stats:', Object.keys(this.confluenceStats));
+      
+      const stats = this.confluenceStats[cleanConfluence];
+      if (!stats || stats.total === 0) {
+        console.log('No stats found for:', cleanConfluence);
+        return null;
+      }
+      
+      console.log('Found stats:', stats);
+      return {
+        winRate: stats.winRate,
+        total: stats.total,
+        wins: stats.wins,
+        losses: stats.losses
+      };
     },
 
     get paginatedSignals() {

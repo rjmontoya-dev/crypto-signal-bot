@@ -483,6 +483,29 @@ body {
   font-weight: 600;
 }
 
+.config-select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.config-select:hover {
+  border-color: #667eea;
+}
+
+.config-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
 .token-list {
   display: flex;
   flex-wrap: wrap;
@@ -643,6 +666,42 @@ body {
   border-radius: 6px;
   margin-bottom: 0.5rem;
   border-left: 3px solid #667eea;
+}
+
+.confluence-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.confluence-text {
+  flex: 1;
+  min-width: 200px;
+}
+
+.confluence-stats {
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.stat-positive {
+  background: rgba(34, 197, 94, 0.1);
+  color: rgb(34, 197, 94);
+}
+
+.stat-negative {
+  background: rgba(239, 68, 68, 0.1);
+  color: rgb(239, 68, 68);
+}
+
+.stat-neutral {
+  background: rgba(156, 163, 175, 0.1);
+  color: rgb(107, 114, 128);
 }
 
 .modal-footer {

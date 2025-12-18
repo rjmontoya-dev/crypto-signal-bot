@@ -248,6 +248,85 @@ app.post('/api/scan', async (req, res) => {
   try {
     // Import dailyScan dynamically to avoid circular dependencies
     const botModule = await import('../bot/index.js');
+    const { dailyScan } = botModule;
+    
+    // Trigger scan in background
+    dailyScan('MANUAL').catch(err => {
+      console.error('Manual scan failed:', err);
+    });
+    
+    res.json({ success: true, message: 'Scan triggered successfully' });
+  } catch (error) {
+    console.error('Error triggering scan:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/confluence-stats - Get win rate statistics for each confluence
+ */
+app.get('/api/confluence-stats', (req, res) => {
+  try {
+    const database = getDatabase();
+    
+    // Get all completed trades with outcomes
+    const completedTrades = database.prepare(`
+      SELECT reasons, outcome, pnl_percent 
+      FROM signals 
+      WHERE outcome IN ('win', 'loss') AND status != ?
+    `).all('skipped');
+    
+    const confluenceStats = {};
+    
+    completedTrades.forEach(trade => {
+      let reasons;
+      try {
+        reasons = JSON.parse(trade.reasons);
+      } catch {
+        reasons = trade.reasons.split(',').map(r => r.trim());
+      }
+      
+      reasons.forEach(reason => {
+        // Clean up reason text
+        const cleanReason = reason
+          .replace(/✓\s*/, '')
+          .replace(/\s*\[.*?\]/, '')
+          .trim();
+        
+        if (!confluenceStats[cleanReason]) {
+          confluenceStats[cleanReason] = {
+            total: 0,
+            wins: 0,
+            losses: 0,
+            winRate: 0
+          };
+        }
+        
+        confluenceStats[cleanReason].total++;
+        if (trade.outcome === 'win') {
+          confluenceStats[cleanReason].wins++;
+        } else {
+          confluenceStats[cleanReason].losses++;
+        }
+      });
+    });
+    
+    // Calculate win rates
+    Object.keys(confluenceStats).forEach(confluence => {
+      const stats = confluenceStats[confluence];
+      stats.winRate = stats.total > 0 
+        ? ((stats.wins / stats.total) * 100).toFixed(1) 
+        : 0;
+    });
+    
+    res.json({ success: true, data: confluenceStats });
+  } catch (error) {
+    console.error('Error fetching confluence stats:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
     
     if (botModule.triggerManualScan) {
       // Trigger scan asynchronously
@@ -415,6 +494,36 @@ app.get('/api/config', (req, res) => {
     res.json({ success: true, data: config });
   } catch (error) {
     console.error('Error fetching config:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/config/timeframe - Update timeframe configuration
+ */
+app.post('/api/config/timeframe', (req, res) => {
+  try {
+    const { timeframe } = req.body;
+    
+    // Validate timeframe
+    const validTimeframes = ['15m', '1h', '4h', '1d'];
+    if (!validTimeframes.includes(timeframe)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid timeframe. Must be one of: ' + validTimeframes.join(', ') 
+      });
+    }
+    
+    // Update the environment variable for the current session
+    process.env.TIMEFRAME = timeframe;
+    
+    res.json({ 
+      success: true, 
+      message: `Timeframe updated to ${timeframe}`,
+      timeframe: timeframe
+    });
+  } catch (error) {
+    console.error('Error updating timeframe:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
