@@ -30,6 +30,73 @@ let cronEnabled = true;
 let hourlyScanTask = null;
 let dailyResetTask = null;
 
+// Track Telegram notification state
+let telegramEnabled = true;
+
+// Track current timeframe (default from env)
+let currentTimeframe = process.env.TIMEFRAME || '4h';
+
+/**
+ * Set timeframe for scanning
+ */
+export function setTimeframe(timeframe) {
+  const validTimeframes = ['30m', '1h', '4h'];
+  if (!validTimeframes.includes(timeframe)) {
+    return { 
+      success: false, 
+      error: 'Invalid timeframe. Must be one of: ' + validTimeframes.join(', ') 
+    };
+  }
+  
+  currentTimeframe = timeframe;
+  console.log(`⏰ Timeframe updated to: ${timeframe}`);
+  return { 
+    success: true, 
+    timeframe: currentTimeframe,
+    message: `Timeframe updated to ${timeframe}` 
+  };
+}
+
+/**
+ * Get current timeframe
+ */
+export function getTimeframe() {
+  return currentTimeframe;
+}
+
+/**
+ * Get Telegram status
+ */
+export function getTelegramStatus() {
+  return { enabled: telegramEnabled };
+}
+
+/**
+ * Enable Telegram notifications
+ */
+export function enableTelegram() {
+  telegramEnabled = true;
+  console.log('✅ Telegram notifications enabled');
+  return { 
+    success: true, 
+    enabled: true,
+    message: 'Telegram notifications enabled. Signals will be sent to Telegram.' 
+  };
+}
+
+/**
+ * Disable Telegram notifications
+ */
+export function disableTelegram() {
+  telegramEnabled = false;
+  console.log('⏸️  Telegram notifications disabled');
+  return { 
+    success: true, 
+    enabled: false,
+    message: 'Telegram notifications disabled. Signals will only be logged to database.' 
+  };
+}
+
 /**
  * Get cron status
  */
@@ -90,6 +157,7 @@ async function dailyScan(isManual = false) {
   
   console.log(isManual ? '\n🎯 Starting MANUAL market scan...' : '\n🔍 Starting hourly market scan...');
   console.log(`⏰ Scan time: ${startTime.toLocaleString()} (${startTime.toISOString()})`);
+  console.log(`📊 Timeframe: ${currentTimeframe}`);
   console.log('═'.repeat(70));
   
   // Check max daily trades
@@ -111,7 +179,7 @@ async function dailyScan(isManual = false) {
   }
   
   const tokens = process.env.TOKENS.split(',').map(t => t.trim());
-  const timeframe = process.env.TIMEFRAME || '4h';
+  const timeframe = currentTimeframe; // Use dynamic timeframe
   
   let scannedCount = 0;
   let signalsGenerated = 0;
@@ -169,46 +237,39 @@ async function dailyScan(isManual = false) {
         console.log(`      Entry: $${signal.entry.toLocaleString()}, TP: $${signal.tp.toLocaleString()}, SL: $${signal.sl.toLocaleString()}`);
         console.log(`      Score: ${signal.score}/${signal.maxScore}`);
         
-        // Check PAPER_TRADING mode
+        // Check PAPER_TRADING mode and Telegram status
         const paperTrading = process.env.PAPER_TRADING === 'true';
+        const shouldSendToTelegram = !paperTrading && telegramEnabled;
         
-        if (paperTrading) {
-          console.log(`   📝 PAPER TRADING MODE - Signal logged (no Telegram alert)`);
-          // Still log to database via sendSignal, but it won't send to Telegram
-          const sent = await sendSignal(signal);
-          
-          if (sent) {
-            signalsGenerated++;
-            generatedSignals.push(signal);
-            
-            // Increment daily trade counter
-            dailyTradeCount++;
-            
-            console.log(`   🔢 Daily trade count: ${dailyTradeCount}/${maxDailyTrades}`);
-            
-            // Break loop after first signal is successfully sent
-            break;
-          }
+        if (!shouldSendToTelegram) {
+          const reason = paperTrading ? 'PAPER TRADING MODE' : 'Telegram disabled';
+          console.log(`   📝 ${reason} - Signal logged (no Telegram alert)`);
         } else {
-          // Live mode - send to Telegram
           console.log(`   📱 Sending to Telegram...`);
-          const sent = await sendSignal(signal);
-          
-          if (sent) {
+        }
+        
+        // Send signal (logs to DB, sends to Telegram if enabled)
+        const sent = await sendSignal(signal, shouldSendToTelegram);
+        
+        if (sent) {
+          if (shouldSendToTelegram) {
             console.log(`   ✅ Alert sent successfully`);
-            signalsGenerated++;
-            generatedSignals.push(signal);
-            
-            // Increment daily trade counter
-            dailyTradeCount++;
-            
-            console.log(`   🔢 Daily trade count: ${dailyTradeCount}/${maxDailyTrades}`);
-            
-            // Break loop after first signal is successfully sent
-            break;
           } else {
-            console.log(`   ⚠️  Failed to send alert - continuing to next token`);
+            console.log(`   ✅ Signal logged to database`);
           }
+          
+          signalsGenerated++;
+          generatedSignals.push(signal);
+          
+          // Increment daily trade counter
+          dailyTradeCount++;
+          
+          console.log(`   🔢 Daily trade count: ${dailyTradeCount}/${maxDailyTrades}`);
+          
+          // Break loop after first signal is successfully sent
+          break;
+        } else {
+          console.log(`   ⚠️  Failed to send alert - continuing to next token`);
         }
         
       } else {

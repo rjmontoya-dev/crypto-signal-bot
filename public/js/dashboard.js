@@ -43,6 +43,7 @@ function dashboard() {
     async init() {
       await this.refreshData();
       await this.fetchCronStatus();
+      await this.fetchTelegramStatus();
       // Auto-refresh every 30 seconds
       setInterval(() => this.refreshData(), 30000);
     },
@@ -99,6 +100,7 @@ function dashboard() {
         
         if (data.success) {
           this.config = data.data;
+          this.selectedTimeframe = data.data.timeframe || '4h';
         }
       } catch (error) {
         console.error('Error fetching config:', error);
@@ -188,6 +190,32 @@ function dashboard() {
       }
     },
 
+    async fetchTelegramStatus() {
+      try {
+        const response = await fetch('/api/telegram-status');
+        const data = await response.json();
+        
+        if (data.success) {
+          this.telegramEnabled = data.enabled;
+        }
+      } catch (error) {
+        console.error('Error fetching Telegram status:', error);
+      }
+    },
+
+    async fetchTelegramStatus() {
+      try {
+        const response = await fetch('/api/telegram-status');
+        const data = await response.json();
+        
+        if (data.success) {
+          this.telegramEnabled = data.enabled;
+        }
+      } catch (error) {
+        console.error('Error fetching telegram status:', error);
+      }
+    },
+
     async toggleCron() {
       try {
         const newState = !this.cronEnabled;
@@ -207,6 +235,54 @@ function dashboard() {
       } catch (error) {
         console.error('Error toggling cron:', error);
         this.showToast('Failed to toggle automated scans', 'error');
+      }
+    },
+
+    async toggleTelegram() {
+      try {
+        const newState = !this.telegramEnabled;
+        const response = await fetch('/api/telegram-toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: newState })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          this.telegramEnabled = data.enabled;
+          this.showToast(data.message, 'success');
+        } else {
+          this.showToast('Failed to toggle Telegram: ' + data.error, 'error');
+        }
+      } catch (error) {
+        console.error('Error toggling Telegram:', error);
+        this.showToast('Failed to toggle Telegram notifications', 'error');
+      }
+    },
+
+    async toggleSignalStatus(signal) {
+      const newStatus = signal.status === 'taken' ? 'not_taken' : 'taken';
+      
+      try {
+        const response = await fetch(`/api/signals/${signal.id}/toggle-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ status: newStatus })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          this.showToast(`Signal marked as ${newStatus === 'taken' ? 'Taken ✅' : 'Not Taken ⏸️'}`, 'success');
+          await this.refreshData();
+        } else {
+          this.showToast('Failed to update status: ' + data.error, 'error');
+        }
+      } catch (error) {
+        console.error('Error toggling signal status:', error);
+        this.showToast('Failed to update status', 'error');
       }
     },
 

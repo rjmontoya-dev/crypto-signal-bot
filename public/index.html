@@ -18,6 +18,10 @@
           <span x-show="cronEnabled">⏸️ Disable Auto Scan</span>
           <span x-show="!cronEnabled">▶️ Enable Auto Scan</span>
         </button>
+        <button @click="toggleTelegram()" :class="telegramEnabled ? 'btn-warning' : 'btn-success'" class="btn">
+          <span x-show="telegramEnabled">📱 Disable Telegram</span>
+          <span x-show="!telegramEnabled">📱 Enable Telegram</span>
+        </button>
         <button @click="triggerScan()" :disabled="scanning" class="btn btn-primary">
           <span x-show="!scanning">🔍 Manual Scan</span>
           <span x-show="scanning">⏳ Scanning...</span>
@@ -159,7 +163,10 @@
                   <small x-text="'(' + Math.round((signal.score / signal.max_score) * 100) + '%)'"></small>
                 </td>
                 <td>
-                  <span class="badge badge-status" x-text="signal.status || 'pending'"></span>
+                  <label class="toggle-switch" @click="toggleSignalStatus(signal)">
+                    <input type="checkbox" :checked="signal.status === 'taken'" disabled>
+                    <span class="toggle-slider"></span>
+                  </label>
                 </td>
                 <td>
                   <span x-show="signal.outcome" class="badge" 
@@ -300,6 +307,20 @@
     <div x-show="activeTab === 'config'" class="tab-content">
       <div class="config-section">
         <h3>⚙️ Bot Configuration</h3>
+        
+        <!-- Timeframe Selector -->
+        <div class="config-control">
+          <label for="timeframe-select">
+            <strong>📊 Scanning Timeframe:</strong>
+          </label>
+          <select id="timeframe-select" x-model="selectedTimeframe" @change="updateTimeframe()" class="timeframe-select">
+            <option value="30m">30 Minutes</option>
+            <option value="1h">1 Hour</option>
+            <option value="4h">4 Hours</option>
+          </select>
+          <span class="config-hint">Select the timeframe for market scanning and signal generation</span>
+        </div>
+
         <div class="config-grid">
           <div class="config-item">
             <strong>Exchange:</strong>

@@ -386,6 +386,139 @@ app.post('/api/cron-toggle', async (req, res) => {
 });
 
 /**
+ * GET /api/telegram-status - Get Telegram notification status
+ */
+app.get('/api/telegram-status', async (req, res) => {
+  try {
+    const messengerModule = await import('../telegram/messenger.js');
+    
+    if (messengerModule.getTelegramStatus) {
+      const status = messengerModule.getTelegramStatus();
+      res.json({ success: true, ...status });
+    } else {
+      res.status(501).json({ success: false, error: 'Telegram status not available' });
+    }
+  } catch (error) {
+    console.error('Error getting Telegram status:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/telegram-toggle - Enable/disable Telegram notifications
+ * Body: { enabled: boolean }
+ */
+app.post('/api/telegram-toggle', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    const messengerModule = await import('../telegram/messenger.js');
+    
+    if (enabled === undefined || enabled === null) {
+      return res.status(400).json({ success: false, error: 'Missing required field: enabled' });
+    }
+    
+    if (messengerModule.enableTelegram && messengerModule.disableTelegram) {
+      const result = enabled ? messengerModule.enableTelegram() : messengerModule.disableTelegram();
+      res.json(result);
+    } else {
+      res.status(501).json({ success: false, error: 'Telegram toggle not available' });
+    }
+  } catch (error) {
+    console.error('Error toggling Telegram:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/telegram-status - Get Telegram notification status
+ */
+app.get('/api/telegram-status', async (req, res) => {
+  try {
+    const botModule = await import('../bot/index.js');
+    
+    if (botModule.getTelegramStatus) {
+      const status = botModule.getTelegramStatus();
+      res.json({ success: true, ...status });
+    } else {
+      res.status(501).json({ success: false, error: 'Telegram status not available' });
+    }
+  } catch (error) {
+    console.error('Error getting telegram status:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/telegram-toggle - Enable/disable Telegram notifications
+ * Body: { enabled: boolean }
+ */
+app.post('/api/telegram-toggle', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    const botModule = await import('../bot/index.js');
+    
+    if (enabled === undefined || enabled === null) {
+      return res.status(400).json({ success: false, error: 'Missing required field: enabled' });
+    }
+    
+    if (botModule.enableTelegram && botModule.disableTelegram) {
+      const result = enabled ? botModule.enableTelegram() : botModule.disableTelegram();
+      res.json(result);
+    } else {
+      res.status(501).json({ success: false, error: 'Telegram toggle not available' });
+    }
+  } catch (error) {
+    console.error('Error toggling telegram:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/signals/:id/toggle-status - Toggle signal status between 'taken' and 'not_taken'
+ * Body: { status: 'taken' | 'not_taken' }
+ */
+app.post('/api/signals/:id/toggle-status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['taken', 'not_taken'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid status. Must be "taken" or "not_taken"'
+      });
+    }
+
+    const database = getDatabase();
+    
+    const result = database.prepare(`
+      UPDATE signals 
+      SET status = ? 
+      WHERE id = ?
+    `).run(status, id);
+
+    if (result.changes > 0) {
+      res.json({
+        success: true,
+        message: `Signal marked as ${status}`,
+        status
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        error: 'Signal not found'
+      });
+    }
+  } catch (error) {
+    console.error('Error toggling signal status:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
  * POST /api/close-trade - Manually close a trade
  * Body: { signalId: number, outcome: 'win' | 'loss' | 'skip', pnlPercent: number (optional for skip) }
  */
@@ -418,14 +551,32 @@ app.post('/api/close-trade', async (req, res) => {
       });
     }
     
-    // Import closeTradeManually from messenger
-    const { closeTradeManually } = await import('../telegram/messenger.js');
-    const result = closeTradeManually(signalId, outcome, finalPnl);
-    
-    if (result.success) {
-      res.json(result);
+    // If outcome is 'skip', delete the signal from database
+    if (outcome === 'skip') {
+      const database = getDatabase();
+      const deleteResult = database.prepare('DELETE FROM signals WHERE id = ?').run(signalId);
+      
+      if (deleteResult.changes > 0) {
+        res.json({ 
+          success: true, 
+          message: 'Signal deleted successfully' 
+        });
+      } else {
+        res.status(404).json({ 
+          success: false, 
+          error: 'Signal not found' 
+        });
+      }
     } else {
-      res.status(400).json(result);
+      // Import closeTradeManually from messenger for win/loss outcomes
+      const { closeTradeManually } = await import('../telegram/messenger.js');
+      const result = closeTradeManually(signalId, outcome, finalPnl);
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
     }
   } catch (error) {
     console.error('Error closing trade:', error);
@@ -449,6 +600,42 @@ app.post('/api/reset-lock', async (req, res) => {
     }
   } catch (error) {
     console.error('Error resetting lock:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/config/timeframe - Update scanning timeframe
+ * Body: { timeframe: string }
+ */
+app.post('/api/config/timeframe', async (req, res) => {
+  try {
+    const { timeframe } = req.body;
+    
+    if (!timeframe) {
+      return res.status(400).json({ success: false, error: 'Missing required field: timeframe' });
+    }
+    
+    // Validate timeframe
+    const validTimeframes = ['30m', '1h', '4h'];
+    if (!validTimeframes.includes(timeframe)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid timeframe. Must be one of: ' + validTimeframes.join(', ') 
+      });
+    }
+    
+    // Import setTimeframe from bot
+    const botModule = await import('../bot/index.js');
+    
+    if (botModule.setTimeframe) {
+      const result = botModule.setTimeframe(timeframe);
+      res.json(result);
+    } else {
+      res.status(501).json({ success: false, error: 'Timeframe update not implemented' });
+    }
+  } catch (error) {
+    console.error('Error updating timeframe:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -479,12 +666,16 @@ app.get('/api/logs', (req, res) => {
 /**
  * GET /api/config - Get environment config (read-only)
  */
-app.get('/api/config', (req, res) => {
+app.get('/api/config', async (req, res) => {
   try {
+    // Import getTimeframe from bot to get current runtime timeframe
+    const botModule = await import('../bot/index.js');
+    const currentTimeframe = botModule.getTimeframe ? botModule.getTimeframe() : (process.env.TIMEFRAME || '4h');
+    
     const config = {
       exchange: process.env.EXCHANGE || 'binance',
       tokens: process.env.TOKENS || '',
-      timeframe: process.env.TIMEFRAME || '4h',
+      timeframe: currentTimeframe,
       paperTrading: process.env.PAPER_TRADING === 'true',
       maxOpenTrades: parseInt(process.env.MAX_OPEN_TRADES || '1'),
       telegramConnected: !!process.env.TELEGRAM_BOT_TOKEN,

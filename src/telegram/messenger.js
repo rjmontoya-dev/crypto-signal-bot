@@ -13,6 +13,7 @@ const __dirname = path.dirname(__filename);
 // Telegram bot instance
 let bot = null;
 let db = null;
+let telegramEnabled = true; // Runtime toggle for Telegram notifications
 
 // ============================================================================
 // DATABASE INITIALIZATION
@@ -264,17 +265,30 @@ function createSignalKeyboard(signalId) {
 /**
  * Send a trading signal to Telegram with interactive buttons
  * @param {Object} signal - Signal object from generateSignal()
+ * @param {boolean} shouldSendToTelegram - Whether to send to Telegram or just log to DB
  * @returns {Promise<boolean>} Success status
  */
-export async function sendSignal(signal) {
+export async function sendSignal(signal, shouldSendToTelegram = true) {
   try {
     // Always log signal to database first
     const signalId = logSignal(signal);
     
+    // Check runtime toggle first
+    if (!telegramEnabled) {
+      console.log('📝 [Telegram disabled by toggle] Signal logged to database only:', signal.symbol, signal.direction);
+      return true;
+    }
+    
+    // If Telegram is disabled via parameter, just return success after logging
+    if (!shouldSendToTelegram) {
+      console.log('📝 [Telegram disabled] Signal logged to database:', signal.symbol, signal.direction);
+      return true;
+    }
+    
     const telegramBot = getBot();
     if (!telegramBot) {
-      console.log('📱 [Telegram disabled] Signal logged to database:', signal.symbol, signal.direction);
-      return false;
+      console.log('📱 [Telegram not configured] Signal logged to database:', signal.symbol, signal.direction);
+      return true;
     }
     
     // Format message
@@ -330,10 +344,11 @@ export async function sendMessage(text) {
  */
 function handleTakeTrade(ctx, signalId) {
   try {
-    updateSignalStatus(signalId, 'taken');
+    const database = initDatabase();
+    database.prepare('UPDATE signals SET status = ? WHERE signal_id = ?').run('taken', signalId);
     ctx.answerCbQuery('✅ Trade logged as taken!');
     ctx.editMessageReplyMarkup({ inline_keyboard: [] }); // Remove buttons
-    ctx.reply(`📝 Trade recorded: ${signalId}`);
+    ctx.reply(`📝 Trade marked as TAKEN: ${signalId}`);
   } catch (error) {
     console.error('❌ Error handling take trade:', error.message);
     ctx.answerCbQuery('❌ Error logging trade');
@@ -345,12 +360,15 @@ function handleTakeTrade(ctx, signalId) {
  */
 function handleSkip(ctx, signalId) {
   try {
-    updateSignalStatus(signalId, 'skipped');
-    ctx.answerCbQuery('⏭️ Signal skipped');
+    const database = initDatabase();
+    // Delete the signal from database when skipped
+    database.prepare('DELETE FROM signals WHERE signal_id = ?').run(signalId);
+    ctx.answerCbQuery('⏭️ Signal skipped and removed');
     ctx.editMessageReplyMarkup({ inline_keyboard: [] }); // Remove buttons
+    ctx.reply(`🗑️ Signal removed: ${signalId}`);
   } catch (error) {
     console.error('❌ Error handling skip:', error.message);
-    ctx.answerCbQuery('❌ Error logging skip');
+    ctx.answerCbQuery('❌ Error skipping signal');
   }
 }
 
@@ -621,4 +639,46 @@ export async function testSend() {
 // Run test if executed directly
 if (process.argv[1] && import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
   testSend().catch(console.error);
+}
+
+// ============================================================================
+// TELEGRAM TOGGLE FUNCTIONS
+// ============================================================================
+
+/**
+ * Get current Telegram notification status
+ * @returns {Object} Status object with enabled flag
+ */
+export function getTelegramStatus() {
+  return {
+    enabled: telegramEnabled
+  };
+}
+
+/**
+ * Enable Telegram notifications
+ * @returns {Object} Result object
+ */
+export function enableTelegram() {
+  telegramEnabled = true;
+  console.log('✅ Telegram notifications ENABLED');
+  return {
+    success: true,
+    enabled: true,
+    message: 'Telegram notifications enabled'
+  };
+}
+
+/**
+ * Disable Telegram notifications
+ * @returns {Object} Result object
+ */
+export function disableTelegram() {
+  telegramEnabled = false;
+  console.log('⏸️ Telegram notifications DISABLED');
+  return {
+    success: true,
+    enabled: false,
+    message: 'Telegram notifications disabled'
+  };
 }
