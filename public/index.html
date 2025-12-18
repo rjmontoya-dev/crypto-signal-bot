@@ -313,10 +313,12 @@
           <label for="timeframe-select">
             <strong>📊 Scanning Timeframe:</strong>
           </label>
-          <select id="timeframe-select" x-model="selectedTimeframe" @change="updateTimeframe()" class="timeframe-select">
+          <select id="timeframe-select" x-model="config.timeframe" @change="updateTimeframe()" class="timeframe-select">
+            <option value="15m">15 Minutes</option>
             <option value="30m">30 Minutes</option>
             <option value="1h">1 Hour</option>
             <option value="4h">4 Hours</option>
+            <option value="1d">1 Day (Daily)</option>
           </select>
           <span class="config-hint">Select the timeframe for market scanning and signal generation</span>
         </div>
@@ -330,6 +332,7 @@
             <strong>Timeframe:</strong>
             <select x-model="config.timeframe" @change="updateTimeframe()" class="config-select">
               <option value="15m">15 Minutes</option>
+              <option value="30m">30 Minutes</option>
               <option value="1h">1 Hour</option>
               <option value="4h">4 Hours</option>
               <option value="1d">1 Day (Daily)</option>

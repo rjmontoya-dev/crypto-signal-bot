@@ -48,6 +48,7 @@ function initDatabase() {
         score REAL NOT NULL,
         max_score REAL NOT NULL,
         reasons TEXT NOT NULL,
+        timeframe TEXT,
         status TEXT DEFAULT 'pending',
         timestamp TEXT NOT NULL,
         action_timestamp TEXT,
@@ -91,8 +92,8 @@ function logSignal(signal) {
   const signalId = `${signal.symbol.replace('/', '')}_${Date.now()}`;
   
   const stmt = database.prepare(`
-    INSERT INTO signals (signal_id, symbol, direction, entry, tp, sl, score, max_score, reasons, timestamp, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO signals (signal_id, symbol, direction, entry, tp, sl, score, max_score, reasons, timeframe, timestamp, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   
   stmt.run(
@@ -105,6 +106,7 @@ function logSignal(signal) {
     signal.score,
     signal.maxScore,
     JSON.stringify(signal.reasons),
+    signal.timeframe || '1h',
     signal.timestamp,
     'pending'
   );

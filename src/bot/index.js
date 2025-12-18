@@ -40,7 +40,7 @@ let currentTimeframe = process.env.TIMEFRAME || '4h';
  * Set timeframe for scanning
  */
 export function setTimeframe(timeframe) {
-  const validTimeframes = ['30m', '1h', '4h'];
+  const validTimeframes = ['15m', '30m', '1h', '4h', '1d'];
   if (!validTimeframes.includes(timeframe)) {
     return { 
       success: false, 
@@ -221,7 +221,7 @@ async function dailyScan(isManual = false) {
       
       // Generate signal (now async - includes disqualifier checks)
       console.log(`   🎯 Evaluating signal criteria...`);
-      const signal = await generateSignal(token, indicators, candles, currentPrice, fundingRate);
+      const signal = await generateSignal(token, indicators, candles, currentPrice, fundingRate, timeframe);
       
       scannedCount++;
       

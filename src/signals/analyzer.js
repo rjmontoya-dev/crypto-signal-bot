@@ -756,9 +756,10 @@ export function scoreSignal(indicators, currentPrice, fundingRate, direction) {
  * @param {Array} candles - OHLCV candles (for disqualifier checks)
  * @param {number} currentPrice - Current price (latest candle close)
  * @param {number} fundingRate - Funding rate (0 for spot markets)
+ * @param {string} timeframe - Timeframe used for analysis
  * @returns {Object|null} Signal object, or { disqualified: true, reasons: [] } if failed checks
  */
-export async function generateSignal(symbol, indicators, candles, currentPrice, fundingRate) {
+export async function generateSignal(symbol, indicators, candles, currentPrice, fundingRate, timeframe) {
   if (!indicators) {
     return null;
   }
@@ -799,6 +800,7 @@ export async function generateSignal(symbol, indicators, candles, currentPrice, 
       score: longScore.score,
       maxScore: longScore.maxScore,
       reasons: longScore.reasoning.map(r => r.replace(/✓\s*/, '').replace(/\s*\[.*?\]/, '')),
+      timeframe: timeframe || process.env.TIMEFRAME || '1h',
       timestamp: new Date().toISOString()
     };
 
@@ -817,6 +819,7 @@ export async function generateSignal(symbol, indicators, candles, currentPrice, 
       score: shortScore.score,
       maxScore: shortScore.maxScore,
       reasons: shortScore.reasoning.map(r => r.replace(/✓\s*/, '').replace(/\s*\[.*?\]/, '')),
+      timeframe: timeframe || process.env.TIMEFRAME || '1h',
       timestamp: new Date().toISOString()
     };
   }
@@ -992,7 +995,7 @@ export async function testSignal() {
     }
     
     // Generate signal (now includes disqualifier checks)
-    const signal = await generateSignal(symbol, indicators, candles, currentPrice, fundingRate);
+    const signal = await generateSignal(symbol, indicators, candles, currentPrice, fundingRate, timeframe);
     
     if (signal && signal.disqualified) {
       console.log('⛔ SIGNAL DISQUALIFIED\n');
@@ -1144,7 +1147,7 @@ export async function testSignals() {
       }
       
       // Generate signal (now includes disqualifier checks)
-      const signal = await generateSignal(token, indicators, candles, currentPrice, fundingRate);
+      const signal = await generateSignal(token, indicators, candles, currentPrice, fundingRate, timeframe);
       
       // Check if disqualified
       if (signal && signal.disqualified) {

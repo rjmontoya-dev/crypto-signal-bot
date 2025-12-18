@@ -100,7 +100,6 @@ function dashboard() {
         
         if (data.success) {
           this.config = data.data;
-          this.selectedTimeframe = data.data.timeframe || '4h';
         }
       } catch (error) {
         console.error('Error fetching config:', error);

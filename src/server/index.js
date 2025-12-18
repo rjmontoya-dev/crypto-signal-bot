@@ -246,14 +246,12 @@ app.get('/api/stats', (req, res) => {
  */
 app.post('/api/scan', async (req, res) => {
   try {
-    // Import dailyScan dynamically to avoid circular dependencies
+    // Import triggerManualScan dynamically to avoid circular dependencies
     const botModule = await import('../bot/index.js');
-    const { dailyScan } = botModule;
+    const { triggerManualScan } = botModule;
     
     // Trigger scan in background
-    dailyScan('MANUAL').catch(err => {
-      console.error('Manual scan failed:', err);
-    });
+    triggerManualScan();
     
     res.json({ success: true, message: 'Scan triggered successfully' });
   } catch (error) {
@@ -617,7 +615,7 @@ app.post('/api/config/timeframe', async (req, res) => {
     }
     
     // Validate timeframe
-    const validTimeframes = ['30m', '1h', '4h'];
+    const validTimeframes = ['15m', '30m', '1h', '4h', '1d'];
     if (!validTimeframes.includes(timeframe)) {
       return res.status(400).json({ 
         success: false, 
@@ -697,7 +695,7 @@ app.post('/api/config/timeframe', (req, res) => {
     const { timeframe } = req.body;
     
     // Validate timeframe
-    const validTimeframes = ['15m', '1h', '4h', '1d'];
+    const validTimeframes = ['15m', '30m', '1h', '4h', '1d'];
     if (!validTimeframes.includes(timeframe)) {
       return res.status(400).json({ 
         success: false, 
