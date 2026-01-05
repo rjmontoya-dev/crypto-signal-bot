@@ -1,6 +1,7 @@
 function dashboard() {
   return {
     activeTab: 'signals',
+    kanbanView: localStorage.getItem('kanbanView') === 'true' || false,
     signals: [],
     stats: {
       overview: {},
@@ -451,6 +452,10 @@ function dashboard() {
     changePageSize() {
       this.pagination.currentPage = 1;
       this.fetchSignals();
+    },
+
+    saveViewPreference() {
+      localStorage.setItem('kanbanView', this.kanbanView);
     },
 
     showToast(message, type = 'info') {

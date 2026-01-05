@@ -82,6 +82,16 @@
       <!-- Filters -->
       <div class="filters">
         <div class="filter-group">
+          <label>View:</label>
+          <label class="view-toggle-switch">
+            <input type="checkbox" x-model="kanbanView" @change="saveViewPreference()">
+            <span class="view-toggle-slider">
+              <span class="view-icon table-icon">📋</span>
+              <span class="view-icon kanban-icon">📊</span>
+            </span>
+          </label>
+        </div>
+        <div class="filter-group">
           <label>Outcome:</label>
           <select x-model="filters.outcome" @change="fetchSignals()">
             <option value="all">All</option>
@@ -120,8 +130,158 @@
         </div>
       </div>
 
+      <!-- Kanban Board View -->
+      <div x-show="kanbanView" class="kanban-board">
+        <div class="kanban-column">
+          <div class="kanban-header">
+            <h4>⏳ Pending</h4>
+            <span class="kanban-count" x-text="signals.filter(s => !s.outcome).length"></span>
+          </div>
+          <div class="kanban-cards">
+            <template x-for="signal in signals.filter(s => !s.outcome)" :key="signal.id">
+              <div class="kanban-card" @click="viewDetails(signal)">
+                <div class="kanban-card-header">
+                  <span class="kanban-symbol" x-text="signal.symbol"></span>
+                  <span class="badge" :class="signal.direction === 'LONG' ? 'badge-long' : 'badge-short'" x-text="signal.direction"></span>
+                </div>
+                <div class="kanban-card-body">
+                  <div class="kanban-row">
+                    <span class="kanban-label">Entry:</span>
+                    <span x-text="'$' + signal.entry.toLocaleString()"></span>
+                  </div>
+                  <div class="kanban-row">
+                    <span class="kanban-label">TP:</span>
+                    <span x-text="'$' + signal.tp.toLocaleString()"></span>
+                  </div>
+                  <div class="kanban-row">
+                    <span class="kanban-label">SL:</span>
+                    <span x-text="'$' + signal.sl.toLocaleString()"></span>
+                  </div>
+                  <div class="kanban-row">
+                    <span class="kanban-label">Score:</span>
+                    <span x-text="signal.score + '/' + signal.max_score + ' (' + Math.round((signal.score / signal.max_score) * 100) + '%)'" class="kanban-score"></span>
+                  </div>
+                  <div class="kanban-row">
+                    <span class="kanban-label">Timeframe:</span>
+                    <span x-text="signal.timeframe || '1h'"></span>
+                  </div>
+                </div>
+                <div class="kanban-card-footer">
+                  <label class="toggle-switch" @click.stop="toggleSignalStatus(signal)">
+                    <input type="checkbox" :checked="signal.status === 'taken'" disabled>
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <button x-show="!signal.outcome" @click.stop="openCloseTrade(signal)" class="btn-icon" title="Close Trade">❌</button>
+                </div>
+              </div>
+            </template>
+            <template x-if="signals.filter(s => !s.outcome).length === 0">
+              <div class="kanban-empty">No pending signals</div>
+            </template>
+          </div>
+        </div>
+
+        <div class="kanban-column">
+          <div class="kanban-header kanban-header-win">
+            <h4>🎯 Wins</h4>
+            <span class="kanban-count" x-text="signals.filter(s => s.outcome === 'win').length"></span>
+          </div>
+          <div class="kanban-cards">
+            <template x-for="signal in signals.filter(s => s.outcome === 'win')" :key="signal.id">
+              <div class="kanban-card kanban-card-win" @click="viewDetails(signal)">
+                <div class="kanban-card-header">
+                  <span class="kanban-symbol" x-text="signal.symbol"></span>
+                  <span class="badge" :class="signal.direction === 'LONG' ? 'badge-long' : 'badge-short'" x-text="signal.direction"></span>
+                </div>
+                <div class="kanban-card-body">
+                  <div class="kanban-row">
+                    <span class="kanban-label">Entry:</span>
+                    <span x-text="'$' + signal.entry.toLocaleString()"></span>
+                  </div>
+                  <div class="kanban-row">
+                    <span class="kanban-label">Score:</span>
+                    <span x-text="signal.score + '/' + signal.max_score" class="kanban-score"></span>
+                  </div>
+                  <div class="kanban-row" x-show="signal.pnl_percent">
+                    <span class="kanban-label">PnL:</span>
+                    <span class="positive" x-text="signal.pnl_percent + '%'"></span>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template x-if="signals.filter(s => s.outcome === 'win').length === 0">
+              <div class="kanban-empty">No wins yet</div>
+            </template>
+          </div>
+        </div>
+
+        <div class="kanban-column">
+          <div class="kanban-header kanban-header-loss">
+            <h4>📉 Losses</h4>
+            <span class="kanban-count" x-text="signals.filter(s => s.outcome === 'loss').length"></span>
+          </div>
+          <div class="kanban-cards">
+            <template x-for="signal in signals.filter(s => s.outcome === 'loss')" :key="signal.id">
+              <div class="kanban-card kanban-card-loss" @click="viewDetails(signal)">
+                <div class="kanban-card-header">
+                  <span class="kanban-symbol" x-text="signal.symbol"></span>
+                  <span class="badge" :class="signal.direction === 'LONG' ? 'badge-long' : 'badge-short'" x-text="signal.direction"></span>
+                </div>
+                <div class="kanban-card-body">
+                  <div class="kanban-row">
+                    <span class="kanban-label">Entry:</span>
+                    <span x-text="'$' + signal.entry.toLocaleString()"></span>
+                  </div>
+                  <div class="kanban-row">
+                    <span class="kanban-label">Score:</span>
+                    <span x-text="signal.score + '/' + signal.max_score" class="kanban-score"></span>
+                  </div>
+                  <div class="kanban-row" x-show="signal.pnl_percent">
+                    <span class="kanban-label">PnL:</span>
+                    <span class="negative" x-text="signal.pnl_percent + '%'"></span>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template x-if="signals.filter(s => s.outcome === 'loss').length === 0">
+              <div class="kanban-empty">No losses</div>
+            </template>
+          </div>
+        </div>
+
+        <div class="kanban-column">
+          <div class="kanban-header kanban-header-skip">
+            <h4>⏭️ Skipped</h4>
+            <span class="kanban-count" x-text="signals.filter(s => s.outcome === 'skip').length"></span>
+          </div>
+          <div class="kanban-cards">
+            <template x-for="signal in signals.filter(s => s.outcome === 'skip')" :key="signal.id">
+              <div class="kanban-card kanban-card-skip" @click="viewDetails(signal)">
+                <div class="kanban-card-header">
+                  <span class="kanban-symbol" x-text="signal.symbol"></span>
+                  <span class="badge" :class="signal.direction === 'LONG' ? 'badge-long' : 'badge-short'" x-text="signal.direction"></span>
+                </div>
+                <div class="kanban-card-body">
+                  <div class="kanban-row">
+                    <span class="kanban-label">Entry:</span>
+                    <span x-text="'$' + signal.entry.toLocaleString()"></span>
+                  </div>
+                  <div class="kanban-row">
+                    <span class="kanban-label">Score:</span>
+                    <span x-text="signal.score + '/' + signal.max_score" class="kanban-score"></span>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template x-if="signals.filter(s => s.outcome === 'skip').length === 0">
+              <div class="kanban-empty">No skipped signals</div>
+            </template>
+          </div>
+        </div>
+      </div>
+
       <!-- Signals Table -->
-      <div class="table-container">
+      <div x-show="!kanbanView" class="table-container">
         <table class="signals-table">
           <thead>
             <tr>
