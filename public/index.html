@@ -10,10 +10,164 @@
 <body>
   <div x-data="dashboard()" x-init="init()" class="container">
     
+    <!-- Mobile Hamburger Button -->
+    <button @click="toggleMenu()" class="mobile-menu-btn">
+      <span class="hamburger-icon" :class="{ 'open': mobileMenuOpen }">
+        <span></span>
+        <span></span>
+        <span></span>
+      </span>
+    </button>
+
+    <!-- Mobile Menu Overlay -->
+    <div x-show="mobileMenuOpen" @click="toggleMenu()" class="mobile-menu-overlay" x-transition:enter="fade-in" x-transition:leave="fade-out"></div>
+
+    <!-- Mobile Side Menu -->
+    <div class="mobile-menu" :class="{ 'open': mobileMenuOpen }">
+      <div class="mobile-menu-header">
+        <h3>Menu</h3>
+        <button @click="toggleMenu()" class="mobile-menu-close">✕</button>
+      </div>
+      
+      <!-- Menu Tabs -->
+      <div class="mobile-menu-tabs">
+        <button @click="switchMenuSection('actions')" :class="{ 'active': menuSection === 'actions' }">Actions</button>
+        <button @click="switchMenuSection('filters')" :class="{ 'active': menuSection === 'filters' }">Filters</button>
+        <button @click="switchMenuSection('configs')" :class="{ 'active': menuSection === 'configs' }">Configs</button>
+      </div>
+
+      <!-- Actions Section -->
+      <div x-show="menuSection === 'actions'" class="menu-section">
+        <h4>Quick Actions</h4>
+        <button @click="resetLock(); toggleMenu()" class="menu-action-btn">
+          <span class="menu-icon">🔓</span>
+          <span>Reset Daily Lock</span>
+        </button>
+        <a href="/api/export-csv" @click="toggleMenu()" class="menu-action-btn">
+          <span class="menu-icon">📥</span>
+          <span>Export CSV</span>
+        </a>
+        <button @click="refreshData(); toggleMenu()" class="menu-action-btn">
+          <span class="menu-icon">🔄</span>
+          <span>Refresh Data</span>
+        </button>
+        
+        <h4 style="margin-top: 20px;">Bulk Actions</h4>
+        <button @click="toggleBulkMode(); toggleMenu()" class="menu-action-btn">
+          <span class="menu-icon">☑️</span>
+          <span x-text="bulkMode ? 'Exit Bulk Mode' : 'Enter Bulk Mode'"></span>
+        </button>
+        <template x-if="bulkMode">
+          <div>
+            <button @click="selectAllSignals()" class="menu-action-btn">
+              <span class="menu-icon">✅</span>
+              <span x-text="selectedSignals.length === signals.length ? 'Deselect All' : 'Select All'"></span>
+            </button>
+            <button @click="bulkMarkTaken(); toggleMenu()" :disabled="selectedSignals.length === 0" class="menu-action-btn">
+              <span class="menu-icon">✔️</span>
+              <span x-text="'Mark Taken (' + selectedSignals.length + ')'"></span>
+            </button>
+            <button @click="bulkSkip(); toggleMenu()" :disabled="selectedSignals.length === 0" class="menu-action-btn btn-danger">
+              <span class="menu-icon">🗑️</span>
+              <span x-text="'Skip Selected (' + selectedSignals.length + ')'"></span>
+            </button>
+          </div>
+        </template>
+      </div>
+
+      <!-- Filters Section -->
+      <div x-show="menuSection === 'filters'" class="menu-section">
+        <h4>Filter Signals</h4>
+        <div class="menu-filter-group">
+          <label>Outcome:</label>
+          <select x-model="filters.outcome" @change="fetchSignals(); toggleMenu()">
+            <option value="all">All</option>
+            <option value="pending">Pending</option>
+            <option value="win">Wins</option>
+            <option value="loss">Losses</option>
+          </select>
+        </div>
+        <div class="menu-filter-group">
+          <label>Status:</label>
+          <select x-model="filters.status" @change="fetchSignals(); toggleMenu()">
+            <option value="">All</option>
+            <option value="pending">Pending</option>
+            <option value="taken">Taken</option>
+            <option value="skipped">Skipped</option>
+          </select>
+        </div>
+        <div class="menu-filter-group">
+          <label>Symbol:</label>
+          <input type="text" x-model="filters.symbol" @keyup.enter="fetchSignals(); toggleMenu()" placeholder="e.g. BTC">
+        </div>
+        <div class="menu-filter-group">
+          <label>Sort By:</label>
+          <select x-model="filters.sort" @change="fetchSignals(); toggleMenu()">
+            <option value="created_at">Date</option>
+            <option value="score">Score</option>
+            <option value="symbol">Symbol</option>
+          </select>
+        </div>
+        <div class="menu-filter-group">
+          <label>Order:</label>
+          <select x-model="filters.order" @change="fetchSignals(); toggleMenu()">
+            <option value="DESC">Newest First</option>
+            <option value="ASC">Oldest First</option>
+          </select>
+        </div>
+        <button @click="filters = { outcome: 'all', status: '', symbol: '', sort: 'created_at', order: 'DESC', timeframe: 'all' }; fetchSignals(); toggleMenu()" class="menu-action-btn btn-secondary" style="margin-top: 15px;">
+          <span class="menu-icon">↺</span>
+          <span>Reset Filters</span>
+        </button>
+      </div>
+
+      <!-- Configs Section -->
+      <div x-show="menuSection === 'configs'" class="menu-section">
+        <h4>Bot Configuration</h4>
+        <div class="config-item">
+          <span>Auto Scan:</span>
+          <button @click="toggleCron()" :class="cronEnabled ? 'badge-success' : 'badge-danger'" class="badge" x-text="cronEnabled ? 'Enabled' : 'Disabled'"></button>
+        </div>
+        <div class="config-item">
+          <span>Telegram:</span>
+          <button @click="toggleTelegram()" :class="telegramEnabled ? 'badge-success' : 'badge-danger'" class="badge" x-text="telegramEnabled ? 'Enabled' : 'Disabled'"></button>
+        </div>
+        <div class="config-item">
+          <span>Exchange:</span>
+          <span class="badge" x-text="config.exchange || 'N/A'"></span>
+        </div>
+        <div class="config-item">
+          <span>Paper Trading:</span>
+          <span :class="config.paperTrading ? 'badge-warning' : 'badge-success'" class="badge" x-text="config.paperTrading ? 'Yes' : 'No'"></span>
+        </div>
+        <div class="config-item">
+          <span>Max Trades:</span>
+          <span class="badge" x-text="config.maxOpenTrades || 'N/A'"></span>
+        </div>
+        <div class="config-item" style="margin-top: 20px;">
+          <span>View Tabs:</span>
+          <div class="desktop-tabs-nav">
+            <button @click="activeTab = 'signals'; toggleMenu()" :class="{ 'active': activeTab === 'signals' }">📊 Signals</button>
+            <button @click="activeTab = 'stats'; toggleMenu()" :class="{ 'active': activeTab === 'stats' }">📈 Stats</button>
+            <button @click="activeTab = 'logs'; toggleMenu()" :class="{ 'active': activeTab === 'logs' }">📝 Logs</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Action Button (Mobile Scan) -->
+    <button @click="triggerScan()" :disabled="scanning" class="fab-scan" :class="{ 'scanning': scanning }">
+      <span x-show="!scanning" class="fab-icon">🔍</span>
+      <span x-show="scanning" class="fab-spinner">⏳</span>
+    </button>
+
     <!-- Header -->
     <header class="header">
       <h1>🤖 Crypto Signal Bot Dashboard</h1>
-      <div class="header-actions">
+      <div class="header-update-time">
+        <span x-text="'Updated ' + timeSinceUpdate"></span>
+      </div>
+      <div class="header-actions desktop-only">
         <button @click="toggleCron()" :class="cronEnabled ? 'btn-warning' : 'btn-success'" class="btn">
           <span x-show="cronEnabled">⏸️ Disable Auto Scan</span>
           <span x-show="!cronEnabled">▶️ Enable Auto Scan</span>
@@ -32,8 +186,34 @@
       </div>
     </header>
 
-    <!-- Stats Cards -->
-    <div class="stats-grid">
+    <!-- Mobile Timeframe Bar -->
+    <div class="timeframe-bar">
+      <div class="timeframe-chips">
+        <button @click="selectTimeframeForScanning('15m')" :class="{ 'active': config.timeframe === '15m' }" class="timeframe-chip">
+          <span>15m</span>
+          <span class="chip-badge" x-text="timeframeCounts['15m']"></span>
+        </button>
+        <button @click="selectTimeframeForScanning('30m')" :class="{ 'active': config.timeframe === '30m' }" class="timeframe-chip">
+          <span>30m</span>
+          <span class="chip-badge" x-text="timeframeCounts['30m']"></span>
+        </button>
+        <button @click="selectTimeframeForScanning('1h')" :class="{ 'active': config.timeframe === '1h' }" class="timeframe-chip">
+          <span>1h</span>
+          <span class="chip-badge" x-text="timeframeCounts['1h']"></span>
+        </button>
+        <button @click="selectTimeframeForScanning('4h')" :class="{ 'active': config.timeframe === '4h' }" class="timeframe-chip">
+          <span>4h</span>
+          <span class="chip-badge" x-text="timeframeCounts['4h']"></span>
+        </button>
+        <button @click="selectTimeframeForScanning('1d')" :class="{ 'active': config.timeframe === '1d' }" class="timeframe-chip">
+          <span>1d</span>
+          <span class="chip-badge" x-text="timeframeCounts['1d']"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats Cards (Desktop) -->
+    <div class="stats-grid desktop-only">
       <div class="stat-card">
         <div class="stat-label">Total Signals</div>
         <div class="stat-value" x-text="stats.overview.totalSignals || 0"></div>
@@ -61,8 +241,36 @@
       </div>
     </div>
 
+    <!-- Stats Badges (Mobile) -->
+    <div class="stats-badges mobile-only">
+      <div class="stat-badge">
+        <span class="stat-badge-label">Signals</span>
+        <span class="stat-badge-value" x-text="stats.overview.totalSignals || 0"></span>
+      </div>
+      <div class="stat-badge">
+        <span class="stat-badge-label">Open</span>
+        <span class="stat-badge-value" x-text="stats.overview.openTrades || 0"></span>
+      </div>
+      <div class="stat-badge success">
+        <span class="stat-badge-label">Wins</span>
+        <span class="stat-badge-value" x-text="stats.overview.wins || 0"></span>
+      </div>
+      <div class="stat-badge danger">
+        <span class="stat-badge-label">Losses</span>
+        <span class="stat-badge-value" x-text="stats.overview.losses || 0"></span>
+      </div>
+      <div class="stat-badge">
+        <span class="stat-badge-label">Win Rate</span>
+        <span class="stat-badge-value" x-text="(stats.overview.winRate || 0) + '%'"></span>
+      </div>
+      <div class="stat-badge" :class="stats.overview.avgPnl >= 0 ? 'success' : 'danger'">
+        <span class="stat-badge-label">Avg PnL</span>
+        <span class="stat-badge-value" x-text="(stats.overview.avgPnl || 0) + '%'"></span>
+      </div>
+    </div>
+
     <!-- Tabs -->
-    <div class="tabs">
+    <div class="tabs desktop-only">
       <button @click="activeTab = 'signals'" :class="{ active: activeTab === 'signals' }" class="tab">
         📊 Signals
       </button>
@@ -78,9 +286,9 @@
     </div>
 
     <!-- Signals Tab -->
-    <div x-show="activeTab === 'signals'" class="tab-content">
-      <!-- Filters -->
-      <div class="filters">
+    <div x-show="activeTab === 'signals'" class="tab-content signals-container">
+      <!-- Desktop Filters -->
+      <div class="filters desktop-only">
         <div class="filter-group">
           <label>View:</label>
           <label class="view-toggle-switch">
@@ -139,7 +347,12 @@
           </div>
           <div class="kanban-cards">
             <template x-for="signal in signals.filter(s => !s.outcome)" :key="signal.id">
-              <div class="kanban-card" @click="viewDetails(signal)">
+              <div class="kanban-card" @click="!bulkMode && viewDetails(signal)">
+                <template x-if="bulkMode">
+                  <div class="bulk-checkbox">
+                    <input type="checkbox" :checked="selectedSignals.includes(signal.id)" @click.stop="toggleSignalSelection(signal.id)">
+                  </div>
+                </template>
                 <div class="kanban-card-header">
                   <span class="kanban-symbol" x-text="signal.symbol"></span>
                   <span class="badge" :class="signal.direction === 'LONG' ? 'badge-long' : 'badge-short'" x-text="signal.direction"></span>
@@ -167,11 +380,11 @@
                   </div>
                 </div>
                 <div class="kanban-card-footer">
-                  <label class="toggle-switch" @click.stop="toggleSignalStatus(signal)">
+                  <label class="toggle-switch" @click.stop="!bulkMode && toggleSignalStatus(signal)">
                     <input type="checkbox" :checked="signal.status === 'taken'" disabled>
                     <span class="toggle-slider"></span>
                   </label>
-                  <button x-show="!signal.outcome" @click.stop="openCloseTrade(signal)" class="btn-icon" title="Close Trade">❌</button>
+                  <button x-show="!signal.outcome && !bulkMode" @click.stop="openCloseTrade(signal)" class="btn-icon" title="Close Trade">❌</button>
                 </div>
               </div>
             </template>
