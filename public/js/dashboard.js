@@ -3,6 +3,7 @@ function dashboard() {
     activeTab: 'signals',
     kanbanView: localStorage.getItem('kanbanView') === 'true' || false,
     signals: [],
+    allSignals: [], // Store all signals for timeframe filtering
     stats: {
       overview: {},
       tokenStats: [],
@@ -18,7 +19,8 @@ function dashboard() {
       status: '',
       symbol: '',
       sort: 'created_at',
-      order: 'DESC'
+      order: 'DESC',
+      timeframe: 'all' // New timeframe filter
     },
     pagination: {
       currentPage: 1,
@@ -40,13 +42,229 @@ function dashboard() {
       message: '',
       type: 'info'
     },
+    // Mobile menu state
+    mobileMenuOpen: false,
+    menuSection: 'actions', // 'actions', 'filters', 'configs'
+    // Bulk selection
+    bulkMode: false,
+    selectedSignals: [],
+    // Pull to refresh
+    pullStartY: 0,
+    pullDelta: 0,
+    pulling: false,
+    // Last update tracking
+    lastUpdateTime: null,
+    updateInterval: null,
 
     async init() {
       await this.refreshData();
       await this.fetchCronStatus();
       await this.fetchTelegramStatus();
+      this.lastUpdateTime = Date.now();
+      
       // Auto-refresh every 30 seconds
       setInterval(() => this.refreshData(), 30000);
+      
+      // Update timer every second
+      this.updateInterval = setInterval(() => {
+        this.$nextTick(() => {});
+      }, 1000);
+      
+      // Setup pull-to-refresh
+      this.setupPullToRefresh();
+    },
+
+    // Mobile menu methods
+    toggleMenu() {
+      this.mobileMenuOpen = !this.mobileMenuOpen;
+    },
+
+    switchMenuSection(section) {
+      this.menuSection = section;
+    },
+
+    // Bulk selection methods
+    toggleBulkMode() {
+      this.bulkMode = !this.bulkMode;
+      if (!this.bulkMode) {
+        this.selectedSignals = [];
+      }
+    },
+
+    toggleSignalSelection(signalId) {
+      const index = this.selectedSignals.indexOf(signalId);
+      if (index > -1) {
+        this.selectedSignals.splice(index, 1);
+      } else {
+        this.selectedSignals.push(signalId);
+      }
+    },
+
+    selectAllSignals() {
+      if (this.selectedSignals.length === this.signals.length) {
+        this.selectedSignals = [];
+      } else {
+        this.selectedSignals = this.signals.map(s => s.id);
+      }
+    },
+
+    async bulkMarkTaken() {
+      if (this.selectedSignals.length === 0) {
+        this.showToast('No signals selected', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/signals/bulk-action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            signalIds: this.selectedSignals,
+            action: 'mark_taken'
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          this.showToast(`${this.selectedSignals.length} signals marked as taken`, 'success');
+          this.selectedSignals = [];
+          this.bulkMode = false;
+          await this.refreshData();
+        } else {
+          this.showToast('Failed to update signals: ' + data.error, 'error');
+        }
+      } catch (error) {
+        console.error('Error in bulk action:', error);
+        this.showToast('Failed to update signals', 'error');
+      }
+    },
+
+    async bulkSkip() {
+      if (this.selectedSignals.length === 0) {
+        this.showToast('No signals selected', 'error');
+        return;
+      }
+
+      if (!confirm(`Skip ${this.selectedSignals.length} signals? This will mark them as skipped.`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/signals/bulk-action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            signalIds: this.selectedSignals,
+            action: 'skip'
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          this.showToast(`${this.selectedSignals.length} signals skipped`, 'success');
+          this.selectedSignals = [];
+          this.bulkMode = false;
+          await this.refreshData();
+        } else {
+          this.showToast('Failed to skip signals: ' + data.error, 'error');
+        }
+      } catch (error) {
+        console.error('Error in bulk skip:', error);
+        this.showToast('Failed to skip signals', 'error');
+      }
+    },
+
+    // Pull to refresh setup
+    setupPullToRefresh() {
+      const signalsContainer = document.querySelector('.signals-container');
+      if (!signalsContainer) return;
+
+      signalsContainer.addEventListener('touchstart', (e) => {
+        if (signalsContainer.scrollTop === 0) {
+          this.pullStartY = e.touches[0].clientY;
+          this.pulling = true;
+        }
+      });
+
+      signalsContainer.addEventListener('touchmove', (e) => {
+        if (!this.pulling) return;
+        
+        const currentY = e.touches[0].clientY;
+        this.pullDelta = currentY - this.pullStartY;
+        
+        if (this.pullDelta > 0 && this.pullDelta < 100) {
+          e.preventDefault();
+        }
+      });
+
+      signalsContainer.addEventListener('touchend', async (e) => {
+        if (this.pulling && this.pullDelta > 80) {
+          await this.refreshData();
+        }
+        this.pulling = false;
+        this.pullDelta = 0;
+      });
+    },
+
+    // Timeframe filtering
+    get timeframeCounts() {
+      const counts = {
+        '15m': 0,
+        '30m': 0,
+        '1h': 0,
+        '4h': 0,
+        '1d': 0
+      };
+      
+      this.allSignals.forEach(signal => {
+        const tf = signal.timeframe || '1h';
+        if (counts.hasOwnProperty(tf)) {
+          counts[tf]++;
+        }
+      });
+      
+      return counts;
+    },
+
+    async selectTimeframeForScanning(timeframe) {
+      try {
+        // Update bot configuration timeframe
+        this.config.timeframe = timeframe;
+        
+        const response = await fetch('/api/config/timeframe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ timeframe })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          this.showToast(`Timeframe changed to ${timeframe}`, 'success');
+          await this.fetchConfig(); // Refresh config to confirm
+        } else {
+          this.showToast('Failed to update timeframe: ' + data.error, 'error');
+        }
+      } catch (error) {
+        console.error('Error updating timeframe:', error);
+        this.showToast('Failed to update timeframe', 'error');
+      }
+    },
+
+    filterByTimeframe(timeframe) {
+      this.filters.timeframe = timeframe;
+      this.pagination.currentPage = 1;
+      this.fetchSignals();
+    },
+
+    // Get time since last update
+    get timeSinceUpdate() {
+      if (!this.lastUpdateTime) return '';
+      const seconds = Math.floor((Date.now() - this.lastUpdateTime) / 1000);
+      if (seconds < 60) return `${seconds}s ago`;
+      const minutes = Math.floor(seconds / 60);
+      return `${minutes}m ago`;
     },
 
     async refreshData() {
@@ -57,6 +275,7 @@ function dashboard() {
         this.fetchCronStatus(),
         this.fetchConfluenceStats()
       ]);
+      this.lastUpdateTime = Date.now();
     },
 
     async fetchSignals() {
@@ -66,11 +285,18 @@ function dashboard() {
           page: this.pagination.currentPage,
           pageSize: this.pagination.pageSize
         });
+        
+        // Don't send 'all' as timeframe filter to backend
+        if (params.get('timeframe') === 'all') {
+          params.delete('timeframe');
+        }
+        
         const response = await fetch(`/api/signals?${params}`);
         const data = await response.json();
         
         if (data.success) {
           this.signals = data.data;
+          this.allSignals = data.data; // Store for timeframe counting
           if (data.pagination) {
             this.pagination = { ...this.pagination, ...data.pagination };
           }

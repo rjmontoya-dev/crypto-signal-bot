@@ -45,7 +45,7 @@ app.use(express.static(path.join(__dirname, '..', '..', 'public')));
 app.get('/api/signals', (req, res) => {
   try {
     const database = getDatabase();
-    const { status, outcome, symbol, sort = 'created_at', order = 'DESC', page = 1, pageSize = 10 } = req.query;
+    const { status, outcome, symbol, timeframe, sort = 'created_at', order = 'DESC', page = 1, pageSize = 10 } = req.query;
     
     let query = 'SELECT * FROM signals WHERE status != ?';
     const params = ['skipped'];
@@ -68,6 +68,12 @@ app.get('/api/signals', (req, res) => {
     if (symbol) {
       query += ' AND symbol LIKE ?';
       params.push(`%${symbol}%`);
+    }
+    
+    // Add timeframe filter
+    if (timeframe && timeframe !== 'all') {
+      query += ' AND timeframe = ?';
+      params.push(timeframe);
     }
     
     // Get total count for pagination
@@ -509,6 +515,60 @@ app.post('/api/signals/:id/toggle-status', async (req, res) => {
     }
   } catch (error) {
     console.error('Error toggling signal status:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/signals/bulk-action - Perform bulk actions on multiple signals
+ * Body: { signalIds: [1, 2, 3], action: 'mark_taken' | 'skip' }
+ */
+app.post('/api/signals/bulk-action', async (req, res) => {
+  try {
+    const { signalIds, action } = req.body;
+
+    if (!Array.isArray(signalIds) || signalIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'signalIds must be a non-empty array'
+      });
+    }
+
+    if (!['mark_taken', 'skip'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid action. Must be "mark_taken" or "skip"'
+      });
+    }
+
+    const database = getDatabase();
+    const placeholders = signalIds.map(() => '?').join(',');
+    
+    let query, params, message;
+    
+    if (action === 'mark_taken') {
+      query = `UPDATE signals SET status = 'taken' WHERE id IN (${placeholders})`;
+      params = signalIds;
+      message = `${signalIds.length} signals marked as taken`;
+    } else if (action === 'skip') {
+      // For skip, we'll mark them as skipped
+      query = `UPDATE signals SET status = 'skipped', outcome = 'skip' WHERE id IN (${placeholders})`;
+      params = signalIds;
+      message = `${signalIds.length} signals skipped`;
+    }
+
+    const result = database.prepare(query).run(...params);
+
+    res.json({
+      success: true,
+      message,
+      affected: result.changes
+    });
+  } catch (error) {
+    console.error('Error performing bulk action:', error);
     res.status(500).json({
       success: false,
       error: error.message
